@@ -1,0 +1,1819 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI AutoDev Platform Demo</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --bg-2: #eef3ff;
+        --surface: rgba(255, 255, 255, 0.7);
+        --surface-strong: rgba(255, 255, 255, 0.88);
+        --line: rgba(15, 23, 42, 0.08);
+        --line-strong: rgba(15, 23, 42, 0.12);
+        --text: #111827;
+        --muted: #6b7280;
+        --soft: #9ca3af;
+        --blue: #2563eb;
+        --blue-weak: rgba(37, 99, 235, 0.1);
+        --green: #16a34a;
+        --amber: #d97706;
+        --shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+        --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.06);
+        --radius: 24px;
+        --radius-sm: 16px;
+        --sidebar-collapsed: 72px;
+        --sidebar-expanded: 252px;
+        --inspector-width: 286px;
+        --transition: 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, "SF Pro Display", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 12% 10%, rgba(37, 99, 235, 0.16), transparent 28%),
+          radial-gradient(circle at 86% 12%, rgba(59, 130, 246, 0.12), transparent 22%),
+          radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.09), transparent 30%),
+          linear-gradient(180deg, #fbfcff 0%, var(--bg) 55%, #f3f6fc 100%);
+        overflow: hidden;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: var(--sidebar-collapsed) minmax(0, 1fr);
+        height: 100vh;
+        transition: grid-template-columns var(--transition);
+      }
+
+      .app.sidebar-open {
+        grid-template-columns: var(--sidebar-expanded) minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 14px 12px;
+        border-right: 1px solid rgba(255, 255, 255, 0.5);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.34));
+        backdrop-filter: blur(24px) saturate(1.4);
+        box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6);
+      }
+
+      .sidebar__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 44px;
+        padding: 6px 4px 10px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand__mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        color: white;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+        flex: 0 0 auto;
+      }
+
+      .brand__text {
+        display: none;
+        flex-direction: column;
+        min-width: 0;
+        transition: opacity var(--transition), transform var(--transition);
+      }
+
+      .app.sidebar-open .brand__text {
+        display: flex;
+      }
+
+      .brand__name {
+        font-size: 13px;
+        line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+      }
+
+      .brand__sub {
+        margin-top: 2px;
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .toggle {
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.65);
+        color: #475569;
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: transform var(--transition), background var(--transition), color var(--transition);
+      }
+
+      .toggle:hover {
+        background: white;
+        color: var(--text);
+        transform: translateY(-1px);
+      }
+
+      .toggle svg,
+      .icon svg,
+      .metric svg,
+      .card__meta svg,
+      .inspector__item svg,
+      .workspace__action svg,
+      .timeline__icon svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 2px;
+      }
+
+      .nav__group {
+        margin-top: 6px;
+        padding: 0 6px 4px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(107, 114, 128, 0.75);
+        display: none;
+      }
+
+      .app.sidebar-open .nav__group {
+        display: block;
+      }
+
+      .nav__item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 14px;
+        background: transparent;
+        color: #475569;
+        cursor: pointer;
+        transition: background var(--transition), color var(--transition), transform var(--transition);
+      }
+
+      .nav__item:hover {
+        background: rgba(255, 255, 255, 0.68);
+        color: var(--text);
+        transform: translateY(-1px);
+      }
+
+      .nav__item.is-active {
+        background: linear-gradient(180deg, rgba(37, 99, 235, 0.14), rgba(37, 99, 235, 0.08));
+        color: #1746b8;
+      }
+
+      .nav__item.is-active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #60a5fa, #2563eb);
+      }
+
+      .app.sidebar-open .nav__item {
+        padding-left: 14px;
+        justify-content: flex-start;
+      }
+
+      .nav__label {
+        display: none;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .app.sidebar-open .nav__label {
+        display: inline;
+      }
+
+      .nav__hint {
+        margin-left: auto;
+        display: none;
+        font-size: 11px;
+        color: var(--soft);
+      }
+
+      .app.sidebar-open .nav__hint {
+        display: inline;
+      }
+
+      .nav__footer {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 16px 28px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+        background: rgba(255, 255, 255, 0.42);
+        backdrop-filter: blur(22px) saturate(1.3);
+      }
+
+      .topbar__title {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .topbar h1 {
+        margin: 0;
+        font-size: 23px;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+      }
+
+      .topbar__stats {
+        display: flex;
+        gap: 18px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .stat strong {
+        display: inline-block;
+        margin-right: 5px;
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .topbar__actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .button {
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .button--ghost {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(15, 23, 42, 0.08);
+        color: var(--text);
+      }
+
+      .button--primary {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        box-shadow: 0 16px 24px rgba(37, 99, 235, 0.18);
+      }
+
+      .shell {
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 14px;
+        padding: 18px 28px 24px;
+        overflow: hidden;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .search {
+        position: relative;
+        max-width: 360px;
+        flex: 1 1 360px;
+      }
+
+      .search input {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.72);
+        padding: 13px 44px 13px 44px;
+        color: var(--text);
+        outline: none;
+        box-shadow: var(--shadow-soft);
+        transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+      }
+
+      .search input:focus {
+        border-color: rgba(37, 99, 235, 0.28);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08), var(--shadow-soft);
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      .search svg {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--soft);
+        width: 16px;
+        height: 16px;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #475569;
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .chip.is-active {
+        background: rgba(37, 99, 235, 0.1);
+        color: #1746b8;
+        border-color: rgba(37, 99, 235, 0.12);
+      }
+
+      .page {
+        min-height: 0;
+        display: none;
+        grid-template-columns: minmax(0, 1fr) var(--inspector-width);
+        gap: 16px;
+        overflow: hidden;
+      }
+
+      .page.is-active {
+        display: grid;
+      }
+
+      .content {
+        min-width: 0;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .overview {
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero-strip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 18px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.62));
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+
+      .hero-strip__copy {
+        min-width: 0;
+      }
+
+      .hero-strip__eyebrow {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(37, 99, 235, 0.8);
+      }
+
+      .hero-strip h2 {
+        margin: 8px 0 6px;
+        font-size: 28px;
+        line-height: 1.05;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-strip p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 58ch;
+        font-size: 14px;
+      }
+
+      .hero-strip__metrics {
+        display: grid;
+        grid-auto-flow: column;
+        gap: 12px;
+      }
+
+      .metric {
+        min-width: 120px;
+        padding: 14px 15px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      }
+
+      .metric__label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric__value {
+        margin-top: 10px;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .project-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 18px 18px 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.68));
+        box-shadow: var(--shadow-soft);
+        cursor: pointer;
+        transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+      }
+
+      .project-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(37, 99, 235, 0.14);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      }
+
+      .project-card__head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .project-card h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        line-height: 1.2;
+        letter-spacing: -0.03em;
+      }
+
+      .project-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .badge--blue {
+        color: #1746b8;
+        background: var(--blue-weak);
+      }
+
+      .badge--green {
+        color: var(--green);
+        background: rgba(22, 163, 74, 0.1);
+      }
+
+      .badge--amber {
+        color: var(--amber);
+        background: rgba(217, 119, 6, 0.12);
+      }
+
+      .project-card__meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .progress {
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.18);
+        overflow: hidden;
+      }
+
+      .progress__bar {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #60a5fa, #2563eb);
+      }
+
+      .project-card__foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--soft);
+      }
+
+      .inspector {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        height: calc(100vh - 126px);
+        overflow: hidden;
+      }
+
+      .panel {
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.64));
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(18px) saturate(1.2);
+        overflow: hidden;
+      }
+
+      .panel__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      }
+
+      .panel__header h3 {
+        margin: 0;
+        font-size: 13px;
+        letter-spacing: -0.02em;
+      }
+
+      .panel__body {
+        padding: 16px 18px 18px;
+      }
+
+      .inspector__stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .inspector__item {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .inspector__item strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
+
+      .inspector__item span {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .detail {
+        display: grid;
+        gap: 16px;
+      }
+
+      .detail__banner {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 20px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.62));
+        box-shadow: var(--shadow-soft);
+      }
+
+      .detail__banner h2 {
+        margin: 6px 0 8px;
+        font-size: 24px;
+        letter-spacing: -0.04em;
+      }
+
+      .detail__banner p {
+        margin: 0;
+        max-width: 64ch;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .detail__headline {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .timeline-workspace {
+        display: grid;
+        grid-template-columns: 278px minmax(0, 1fr);
+        gap: 16px;
+        min-height: 0;
+      }
+
+      .timeline {
+        display: flex;
+        flex-direction: column;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.62));
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+
+      .timeline__header {
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      }
+
+      .timeline__header h3 {
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .timeline__header p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .timeline__list {
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .timeline__item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 16px;
+        padding: 12px;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        transition: background var(--transition), border-color var(--transition), transform var(--transition);
+      }
+
+      .timeline__item:hover {
+        background: rgba(255, 255, 255, 0.74);
+        transform: translateY(-1px);
+      }
+
+      .timeline__item.is-current {
+        background: rgba(37, 99, 235, 0.08);
+        border-color: rgba(37, 99, 235, 0.12);
+      }
+
+      .timeline__icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        background: rgba(148, 163, 184, 0.14);
+        color: #64748b;
+      }
+
+      .timeline__item.is-complete .timeline__icon {
+        background: rgba(37, 99, 235, 0.16);
+        color: #1746b8;
+      }
+
+      .timeline__item.is-current .timeline__icon {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        box-shadow: 0 10px 18px rgba(37, 99, 235, 0.16);
+      }
+
+      .timeline__label {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .timeline__label strong {
+        display: block;
+        font-size: 13px;
+        letter-spacing: -0.02em;
+        margin-bottom: 3px;
+      }
+
+      .timeline__label span {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .workspace {
+        min-width: 0;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 14px;
+      }
+
+      .workspace__hero,
+      .workspace__card {
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.64));
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+
+      .workspace__hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 18px 20px;
+      }
+
+      .workspace__hero h3 {
+        margin: 0 0 6px;
+        font-size: 17px;
+        letter-spacing: -0.03em;
+      }
+
+      .workspace__hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        max-width: 64ch;
+      }
+
+      .workspace__actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .workspace__action {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 10px 13px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--text);
+        cursor: pointer;
+        transition: transform var(--transition), background var(--transition), border-color var(--transition);
+      }
+
+      .workspace__action:hover {
+        transform: translateY(-1px);
+        border-color: rgba(37, 99, 235, 0.16);
+        background: white;
+      }
+
+      .workspace__grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 14px;
+        min-height: 0;
+      }
+
+      .workspace__card {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .workspace__card header {
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      }
+
+      .workspace__card header h4 {
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .workspace__card header p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .workspace__card .body {
+        padding: 16px 18px 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .dropzone {
+        border: 1px dashed rgba(37, 99, 235, 0.18);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(37, 99, 235, 0.04), rgba(255, 255, 255, 0.7));
+        padding: 20px;
+        min-height: 154px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+      }
+
+      .dropzone__icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        background: white;
+        display: grid;
+        place-items: center;
+        box-shadow: var(--shadow-soft);
+        color: var(--blue);
+        margin-bottom: 12px;
+      }
+
+      .dropzone h5 {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+
+      .dropzone p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        max-width: 40ch;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .list__row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: rgba(248, 250, 252, 0.92);
+        border: 1px solid rgba(15, 23, 42, 0.06);
+      }
+
+      .list__row strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
+
+      .list__row span {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .inspector__progress {
+        display: grid;
+        gap: 12px;
+      }
+
+      .progress-legend {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .progress-legend strong {
+        color: var(--text);
+        font-size: 26px;
+        letter-spacing: -0.04em;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 1200px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .page {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .inspector {
+          position: static;
+          height: auto;
+        }
+
+        .timeline-workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .workspace__grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 860px) {
+        body {
+          overflow: auto;
+        }
+
+        .app,
+        .app.sidebar-open {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          border-right: 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+          flex-direction: row;
+          align-items: center;
+          overflow: auto;
+        }
+
+        .sidebar__top,
+        .nav,
+        .nav__footer {
+          flex-direction: row;
+          align-items: center;
+        }
+
+        .nav {
+          padding-top: 0;
+        }
+
+        .nav__group {
+          display: none !important;
+        }
+
+        .nav__label,
+        .brand__text,
+        .nav__hint {
+          display: inline !important;
+        }
+
+        .topbar {
+          padding-inline: 16px;
+        }
+
+        .shell {
+          padding-inline: 16px;
+        }
+
+        .hero-strip {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .hero-strip__metrics {
+          grid-auto-flow: row;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="sidebar">
+        <div class="sidebar__top">
+          <div class="brand">
+            <div class="brand__mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 7h14M5 12h14M5 17h14" />
+              </svg>
+            </div>
+            <div class="brand__text">
+              <div class="brand__name">AI AutoDev</div>
+              <div class="brand__sub">Control Center</div>
+            </div>
+          </div>
+          <button class="toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+            <svg id="toggleIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <div class="nav__group">Workspace</div>
+          <button class="nav__item is-active" type="button" data-page="overview">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="8" height="8" rx="2" />
+                <rect x="13" y="3" width="8" height="8" rx="2" />
+                <rect x="3" y="13" width="8" height="8" rx="2" />
+                <rect x="13" y="13" width="8" height="8" rx="2" />
+              </svg>
+            </span>
+            <span class="nav__label">Projects</span>
+            <span class="nav__hint">6</span>
+          </button>
+          <button class="nav__item" type="button" data-page="detail">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v4" />
+                <path d="M12 18v4" />
+                <path d="M4.93 4.93l2.83 2.83" />
+                <path d="M16.24 16.24l2.83 2.83" />
+                <path d="M2 12h4" />
+                <path d="M18 12h4" />
+                <path d="M4.93 19.07l2.83-2.83" />
+                <path d="M16.24 7.76l2.83-2.83" />
+                <circle cx="12" cy="12" r="4" />
+              </svg>
+            </span>
+            <span class="nav__label">Activity</span>
+            <span class="nav__hint">Live</span>
+          </button>
+
+          <div class="nav__group">System</div>
+          <button class="nav__item" type="button">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 20.91 10H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </span>
+            <span class="nav__label">Settings</span>
+          </button>
+          <button class="nav__item" type="button">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3" />
+                <path d="M12 17h.01" />
+              </svg>
+            </span>
+            <span class="nav__label">Help</span>
+          </button>
+        </nav>
+
+        <div class="nav__footer">
+          <button class="nav__item" type="button">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21a8 8 0 0 0-16 0" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </span>
+            <span class="nav__label">Hanzel</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar__title">
+            <h1>AI AutoDev Platform</h1>
+            <div class="topbar__stats">
+              <span class="stat"><strong>6</strong>Total</span>
+              <span class="stat"><strong>3</strong>Active</span>
+            </div>
+          </div>
+          <div class="topbar__actions">
+            <button class="button button--ghost" type="button">Refresh</button>
+            <button class="button button--primary" type="button">New Project</button>
+          </div>
+        </header>
+
+        <section class="shell">
+          <div class="row">
+            <div class="search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-3.5-3.5" />
+              </svg>
+              <input type="text" value="Search projects..." aria-label="Search projects" />
+            </div>
+            <div class="chips" aria-label="Filters">
+              <span class="chip is-active">All</span>
+              <span class="chip">In Progress</span>
+              <span class="chip">Completed</span>
+              <span class="chip">Paused</span>
+            </div>
+          </div>
+
+          <section class="page is-active" id="overviewPage" aria-label="Project overview">
+            <div class="content">
+              <div class="overview">
+                <div class="hero-strip">
+                  <div class="hero-strip__copy">
+                    <div class="hero-strip__eyebrow">Overview control center</div>
+                    <h2>Manage multiple software projects with a calm Mac-style workspace.</h2>
+                    <p>
+                      Track progress, move between stages, and open the detailed workspace for any project card.
+                    </p>
+                  </div>
+                  <div class="hero-strip__metrics">
+                    <div class="metric">
+                      <div class="metric__label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M3 3v18h18" />
+                          <path d="M7 14l3-4 4 3 5-7" />
+                        </svg>
+                        Progress
+                      </div>
+                      <div class="metric__value">55%</div>
+                    </div>
+                    <div class="metric">
+                      <div class="metric__label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 6v6l4 2" />
+                        </svg>
+                        Updated
+                      </div>
+                      <div class="metric__value">2h</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid">
+                  <article class="project-card" data-open-detail>
+                    <div class="project-card__head">
+                      <div>
+                        <h3>E-commerce Platform</h3>
+                        <p>Real-time inventory, order tracking, and AI recommendations.</p>
+                      </div>
+                      <span class="badge badge--blue">In Progress</span>
+                    </div>
+                    <div class="project-card__meta">
+                      <span>Stage 6: Development</span>
+                    </div>
+                    <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:55%"></div></div>
+                    <div class="project-card__foot">
+                      <span>Updated 2 hours ago</span>
+                      <span>55%</span>
+                    </div>
+                  </article>
+
+                  <article class="project-card" data-open-detail>
+                    <div class="project-card__head">
+                      <div>
+                        <h3>Analytics Dashboard</h3>
+                        <p>Business intelligence with customizable charts and automated reports.</p>
+                      </div>
+                      <span class="badge badge--blue">In Progress</span>
+                    </div>
+                    <div class="project-card__meta">
+                      <span>Stage 3: PRD Generation</span>
+                    </div>
+                    <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:22%"></div></div>
+                    <div class="project-card__foot">
+                      <span>Updated 1 day ago</span>
+                      <span>22%</span>
+                    </div>
+                  </article>
+
+                  <article class="project-card" data-open-detail>
+                    <div class="project-card__head">
+                      <div>
+                        <h3>Mobile Banking App</h3>
+                        <p>Biometric authentication and instant transfer flows.</p>
+                      </div>
+                      <span class="badge badge--green">Completed</span>
+                    </div>
+                    <div class="project-card__meta">
+                      <span>Stage 9: Deployment</span>
+                    </div>
+                    <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:100%; background:linear-gradient(90deg,#22c55e,#16a34a)"></div></div>
+                    <div class="project-card__foot">
+                      <span>Updated 3 days ago</span>
+                      <span>100%</span>
+                    </div>
+                  </article>
+
+                  <article class="project-card" data-open-detail>
+                    <div class="project-card__head">
+                      <div>
+                        <h3>Social Media Platform</h3>
+                        <p>Content moderation and real-time messaging workflow.</p>
+                      </div>
+                      <span class="badge badge--amber">Planning</span>
+                    </div>
+                    <div class="project-card__meta">
+                      <span>Stage 2: Market Research</span>
+                    </div>
+                    <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:12%"></div></div>
+                    <div class="project-card__foot">
+                      <span>Updated 5 hours ago</span>
+                      <span>12%</span>
+                    </div>
+                  </article>
+
+                  <article class="project-card" data-open-detail>
+                    <div class="project-card__head">
+                      <div>
+                        <h3>Healthcare Portal</h3>
+                        <p>Telemedicine, scheduling, and health record operations.</p>
+                      </div>
+                      <span class="badge badge--blue">In Progress</span>
+                    </div>
+                    <div class="project-card__meta">
+                      <span>Stage 8: QA Testing</span>
+                    </div>
+                    <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:78%"></div></div>
+                    <div class="project-card__foot">
+                      <span>Updated 4 hours ago</span>
+                      <span>78%</span>
+                    </div>
+                  </article>
+
+                  <article class="project-card" data-open-detail>
+                    <div class="project-card__head">
+                      <div>
+                        <h3>Education Platform</h3>
+                        <p>Adaptive learning curriculum and content orchestration.</p>
+                      </div>
+                      <span class="badge badge--amber">Paused</span>
+                    </div>
+                    <div class="project-card__meta">
+                      <span>Stage 5: Architecture</span>
+                    </div>
+                    <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:45%"></div></div>
+                    <div class="project-card__foot">
+                      <span>Updated 1 week ago</span>
+                      <span>45%</span>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+
+            <aside class="inspector" aria-label="Overview inspector">
+              <section class="panel">
+                <div class="panel__header">
+                  <h3>Focus</h3>
+                  <span class="badge badge--blue">Live</span>
+                </div>
+                <div class="panel__body">
+                  <div class="inspector__stack">
+                    <div class="inspector__item">
+                      <div class="timeline__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M4 12h16" />
+                          <path d="M4 6h16" />
+                          <path d="M4 18h10" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Overview-first layout</strong>
+                        <span>Project cards stay compact, readable, and structured for quick scanning.</span>
+                      </div>
+                    </div>
+                    <div class="inspector__item">
+                      <div class="timeline__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 2v20" />
+                          <path d="M2 12h20" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Apple-like restraint</strong>
+                        <span>Thin dividers, quiet blue states, and soft glass surfaces only.</span>
+                      </div>
+                    </div>
+                    <div class="inspector__item">
+                      <div class="timeline__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 20V10" />
+                          <path d="M18 20V4" />
+                          <path d="M6 20v-6" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Detail state ready</strong>
+                        <span>Open any card to reveal the stage workspace, timeline, and inspector.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          </section>
+
+          <section class="page" id="detailPage" aria-label="Project detail">
+            <div class="content">
+              <div class="detail">
+                <div class="detail__banner">
+                  <div>
+                    <div class="detail__headline">
+                      <span class="badge badge--blue">Stage 6</span>
+                      <span class="badge badge--blue">In Progress</span>
+                    </div>
+                    <h2>E-commerce Platform / Stage Workspace</h2>
+                    <p>
+                      The workspace is arranged around a single decision: continue automation, review the current work,
+                      or move the project to the next stage.
+                    </p>
+                  </div>
+                  <div class="workspace__actions">
+                    <button class="workspace__action" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Export
+                    </button>
+                    <button class="workspace__action" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                      Comment
+                    </button>
+                    <button class="workspace__action" type="button" id="backToOverview">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 12H5" />
+                        <path d="M12 19l-7-7 7-7" />
+                      </svg>
+                      Back
+                    </button>
+                  </div>
+                </div>
+
+                <div class="timeline-workspace">
+                  <section class="timeline">
+                    <div class="timeline__header">
+                      <h3>Development Stages</h3>
+                      <p>9-step workflow with the current stage highlighted.</p>
+                    </div>
+                    <div class="timeline__list">
+                      <button class="timeline__item is-complete" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>Discovery</strong>
+                          <span>Requirements gathering</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item is-complete" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>Market Research</strong>
+                          <span>Competitive analysis</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item is-complete" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>PRD Generation</strong>
+                          <span>Product specification</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item is-complete" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>UI Design</strong>
+                          <span>Interface mockups</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item is-complete" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>Architecture</strong>
+                          <span>Technical design</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item is-current" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="1" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>Development</strong>
+                          <span>Current working stage</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="1" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>Code Review</strong>
+                          <span>Quality checks</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="1" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>QA Testing</strong>
+                          <span>Bug verification</span>
+                        </div>
+                      </button>
+                      <button class="timeline__item" type="button">
+                        <div class="timeline__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="1" />
+                          </svg>
+                        </div>
+                        <div class="timeline__label">
+                          <strong>Deployment</strong>
+                          <span>Production release</span>
+                        </div>
+                      </button>
+                    </div>
+                  </section>
+
+                  <section class="workspace">
+                    <div class="workspace__hero">
+                      <div>
+                        <h3>Active Task: Development</h3>
+                        <p>
+                          The workspace focuses on the current decision. In this stage the surface should help the user
+                          inspect progress, upload materials, and continue the automation flow.
+                        </p>
+                      </div>
+                      <div class="workspace__actions">
+                        <button class="workspace__action" type="button">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5v14" />
+                            <path d="M5 12h14" />
+                          </svg>
+                          Add File
+                        </button>
+                        <button class="workspace__action" type="button">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20V10" />
+                            <path d="M18 20V4" />
+                            <path d="M6 20v-6" />
+                          </svg>
+                          Inspect
+                        </button>
+                        <button class="workspace__action" type="button">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+                          </svg>
+                          Review
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="workspace__grid">
+                      <article class="workspace__card">
+                        <header>
+                          <h4>Requirements Summary</h4>
+                          <p>Primary reference context for the current stage.</p>
+                        </header>
+                        <div class="body">
+                          <div class="list">
+                            <div class="list__row">
+                              <div>
+                                <strong>Build scope</strong>
+                                <span>Modern e-commerce platform with real-time inventory management.</span>
+                              </div>
+                              <span class="badge badge--blue">Core</span>
+                            </div>
+                            <div class="list__row">
+                              <div>
+                                <strong>Key features</strong>
+                                <span>Authentication, cart, order tracking, admin dashboard, analytics.</span>
+                              </div>
+                              <span class="badge badge--blue">5 items</span>
+                            </div>
+                            <div class="list__row">
+                              <div>
+                                <strong>Current output</strong>
+                                <span>UI patterns are being translated into production-ready components.</span>
+                              </div>
+                              <span class="badge badge--green">Ready</span>
+                            </div>
+                          </div>
+
+                          <div class="workspace__actions">
+                            <button class="workspace__action" type="button">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                              </svg>
+                              View PRD
+                            </button>
+                            <button class="workspace__action" type="button">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                              </svg>
+                              Add Comment
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+
+                      <article class="workspace__card">
+                        <header>
+                          <h4>Upload Zone</h4>
+                          <p>Drag in design files, references, or notes.</p>
+                        </header>
+                        <div class="body">
+                          <div class="dropzone">
+                            <div>
+                              <div class="dropzone__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="17 8 12 3 7 8" />
+                                  <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                              </div>
+                              <h5>Drop files here</h5>
+                              <p>PNG, PDF, Figma export, or markdown brief. The workspace uses these files as the design source.</p>
+                            </div>
+                          </div>
+
+                          <div class="list">
+                            <div class="list__row">
+                              <div>
+                                <strong>Attached file</strong>
+                                <span>pricing-screen-reference.fig</span>
+                              </div>
+                              <span class="badge badge--blue">Preview</span>
+                            </div>
+                            <div class="list__row">
+                              <div>
+                                <strong>Attached file</strong>
+                                <span>prd-v3.pdf</span>
+                              </div>
+                              <span class="badge badge--green">Ready</span>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+
+            <aside class="inspector" aria-label="Detail inspector">
+              <section class="panel">
+                <div class="panel__header">
+                  <h3>Project Info</h3>
+                  <span class="badge badge--blue">55%</span>
+                </div>
+                <div class="panel__body">
+                  <div class="inspector__stack inspector__progress">
+                    <div>
+                      <div class="progress-legend">
+                        <span>Overall Progress</span>
+                        <strong>55%</strong>
+                      </div>
+                      <div class="progress" style="margin-top:10px"><div class="progress__bar" style="width:55%"></div></div>
+                    </div>
+                    <div class="inspector__item">
+                      <div class="timeline__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M8 2v4" />
+                          <path d="M16 2v4" />
+                          <rect x="3" y="4" width="18" height="18" rx="2" />
+                          <path d="M3 10h18" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Updated</strong>
+                        <span>2 hours ago</span>
+                      </div>
+                    </div>
+                    <div class="inspector__item">
+                      <div class="timeline__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M4 6h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 18h10" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Current Stage</strong>
+                        <span>Development</span>
+                      </div>
+                    </div>
+                    <div class="inspector__item">
+                      <div class="timeline__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Decision</strong>
+                        <span>Continue automation or intervene manually.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel__header">
+                  <h3>Events</h3>
+                  <span class="badge badge--green">Live</span>
+                </div>
+                <div class="panel__body">
+                  <div class="list">
+                    <div class="list__row">
+                      <div>
+                        <strong>AI agent refreshed code scaffold</strong>
+                        <span>18 minutes ago</span>
+                      </div>
+                    </div>
+                    <div class="list__row">
+                      <div>
+                        <strong>PRD reference attached</strong>
+                        <span>45 minutes ago</span>
+                      </div>
+                    </div>
+                    <div class="list__row">
+                      <div>
+                        <strong>Review feedback pending</strong>
+                        <span>1 hour ago</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const app = document.getElementById("app");
+      const sidebarToggle = document.getElementById("sidebarToggle");
+      const toggleIcon = document.getElementById("toggleIcon");
+      const overviewPage = document.getElementById("overviewPage");
+      const detailPage = document.getElementById("detailPage");
+      const backToOverview = document.getElementById("backToOverview");
+      const navItems = Array.from(document.querySelectorAll("[data-page]"));
+      const openDetailTriggers = Array.from(document.querySelectorAll("[data-open-detail]"));
+
+      function setSidebar(expanded) {
+        app.classList.toggle("sidebar-open", expanded);
+        sidebarToggle.setAttribute("aria-pressed", expanded ? "true" : "false");
+        toggleIcon.innerHTML = expanded
+          ? '<path d="M9 18l6-6-6-6" />'
+          : '<path d="M15 18l-6-6 6-6" />';
+      }
+
+      function setPage(page) {
+        const detail = page === "detail";
+        overviewPage.classList.toggle("is-active", !detail);
+        detailPage.classList.toggle("is-active", detail);
+        navItems.forEach((item) => {
+          const active = item.dataset.page === (detail ? "detail" : "overview");
+          item.classList.toggle("is-active", active);
+        });
+      }
+
+      sidebarToggle.addEventListener("click", () => {
+        setSidebar(!app.classList.contains("sidebar-open"));
+      });
+
+      navItems.forEach((item) => {
+        item.addEventListener("click", () => setPage(item.dataset.page));
+      });
+
+      openDetailTriggers.forEach((card) => {
+        card.addEventListener("click", () => setPage("detail"));
+      });
+
+      backToOverview.addEventListener("click", () => setPage("overview"));
+
+      setSidebar(false);
+      setPage("overview");
+    </script>
+  </body>
+</html>

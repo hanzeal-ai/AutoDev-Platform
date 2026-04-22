@@ -1,0 +1,42 @@
+mod creation_messages;
+mod creation_threads;
+mod feasibility;
+mod materials;
+mod plan_development;
+
+use crate::protocol;
+use crate::runtime;
+use serde_json::Value;
+
+pub(super) fn dispatch(
+    inbound: &protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+) -> Option<Result<(&'static str, Value), String>> {
+    match inbound.message_type.as_str() {
+        protocol::MESSAGE_COMMAND_CREATE_CREATION_THREAD => {
+            Some(creation_threads::handle_create(runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_RENAME_CREATION_THREAD => {
+            Some(creation_threads::handle_rename(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_ARCHIVE_CREATION_THREAD => {
+            Some(creation_threads::handle_archive(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_DELETE_CREATION_THREAD => {
+            Some(creation_threads::handle_delete(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_ADD_CREATION_MESSAGE => Some(
+            creation_messages::handle_add_message(inbound, runtime_paths),
+        ),
+        protocol::MESSAGE_COMMAND_ADD_CREATION_MATERIALS => {
+            Some(materials::handle_add_materials(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_CONFIRM_FEASIBILITY => {
+            Some(feasibility::handle_confirm(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_PLAN_DEVELOPMENT => {
+            Some(plan_development::handle_plan(inbound, runtime_paths))
+        }
+        _ => None,
+    }
+}

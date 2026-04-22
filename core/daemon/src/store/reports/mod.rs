@@ -1,0 +1,45 @@
+mod chat;
+mod deepseek;
+mod draft;
+mod file;
+mod llm;
+mod update;
+
+use super::{Store, StoreResult};
+use serde_json::Value;
+
+impl Store {
+    pub(super) fn thread_report_draft(&self, thread_id: &str) -> StoreResult<Value> {
+        draft::load_thread_report_draft(self, thread_id)
+    }
+
+    pub(super) fn update_report_from_patch(
+        &self,
+        thread_id: &str,
+        patch: &Value,
+        now: i64,
+    ) -> StoreResult<()> {
+        update::update_report_from_patch(self, thread_id, patch, now)
+    }
+
+    pub(super) fn generate_clarification_turn(
+        &self,
+        thread_id: &str,
+        user_message: &str,
+    ) -> StoreResult<chat::ClarificationTurn> {
+        chat::generate_clarification_turn(self, thread_id, user_message)
+    }
+
+    pub(super) fn generate_final_report(&self, thread_id: &str) -> StoreResult<Value> {
+        deepseek::generate_final_report(self, thread_id)
+    }
+
+    pub(super) fn persist_report(
+        &self,
+        thread_id: &str,
+        report: &Value,
+        now: i64,
+    ) -> StoreResult<()> {
+        update::persist_report(self, thread_id, report, now)
+    }
+}
