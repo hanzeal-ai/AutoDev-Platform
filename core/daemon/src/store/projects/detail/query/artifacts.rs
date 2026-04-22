@@ -15,6 +15,8 @@ pub(in crate::store::projects::detail) fn list_stage_artifacts(
 SELECT id, name, kind, updated_at_ms, file_path
 FROM stage_artifacts
 WHERE project_id = ?1 AND stage = ?2
+  AND file_path IS NOT NULL
+  AND TRIM(file_path) != ''
 ORDER BY updated_at_ms DESC
 "#,
         )

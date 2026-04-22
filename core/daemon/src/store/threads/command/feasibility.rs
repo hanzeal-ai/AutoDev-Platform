@@ -1,5 +1,6 @@
-use super::super::super::helpers::{now_ms, stage_defaults, to_json_string};
+use super::super::super::helpers::now_ms;
 use super::super::super::{Store, StoreResult};
+use crate::logger;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -51,7 +52,6 @@ INSERT INTO projects (
             project_id
         };
 
-        let prd_defaults = stage_defaults("prd");
         self.conn
             .execute(
                 r#"
@@ -71,13 +71,13 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
 "#,
                 params![
                     project_id,
-                    prd_defaults.objective,
-                    to_json_string(&prd_defaults.input_contexts),
-                    to_json_string(&prd_defaults.step_progress),
-                    to_json_string(&prd_defaults.risk_items),
-                    to_json_string(&prd_defaults.event_flow),
-                    prd_defaults.primary_action,
-                    to_json_string(&prd_defaults.secondary_actions),
+                    "",
+                    "[]",
+                    "[]",
+                    "[]",
+                    "[]",
+                    "",
+                    "[]",
                     now
                 ],
             )
@@ -88,16 +88,6 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
                 r#"
 INSERT INTO stage_events (id, project_id, stage, title, detail, created_at_ms)
 VALUES (?1, ?2, 'prd', '立项已确认', '系统已根据可行性报告创建项目并进入 PRD 阶段。', ?3)
-"#,
-                params![Uuid::new_v4().to_string(), project_id, now],
-            )
-            .map_err(|err| err.to_string())?;
-
-        self.conn
-            .execute(
-                r#"
-INSERT INTO stage_artifacts (id, project_id, stage, name, kind, updated_at_ms, file_path, content_type)
-VALUES (?1, ?2, 'prd', 'PRD 草案 v0.1', '文档', ?3, NULL, 'text/markdown')
 "#,
                 params![Uuid::new_v4().to_string(), project_id, now],
             )
@@ -133,6 +123,17 @@ WHERE id = ?2
                 params![now, project_id],
             )
             .map_err(|err| err.to_string())?;
+
+        if let Err(reason) = self.generate_project_stage_ai(&project_id, Some("prd")) {
+            logger::error_fields(
+                "auto prd ai trigger failed",
+                &[
+                    ("project_id", project_id.clone()),
+                    ("stage", "prd".to_string()),
+                    ("reason", reason),
+                ],
+            );
+        }
 
         Ok(json!({
             "thread_id": thread_id,

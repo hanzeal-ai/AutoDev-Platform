@@ -18,12 +18,27 @@ ERROR_LOG="$BASE_DIR/error.log"
 mkdir -p "$BASE_DIR"
 touch "$COMBINED_LOG" "$INFO_LOG" "$WARN_LOG" "$ERROR_LOG"
 
-awk -v combined="$COMBINED_LOG" -v info="$INFO_LOG" -v warn="$WARN_LOG" -v error="$ERROR_LOG" '
-function timestamp(   now) {
-  now = systime()
-  return strftime("%Y-%m-%d %H:%M:%S %z", now)
-}
+while IFS= read -r line || [[ -n "$line" ]]; do
+  timestamp="$(date '+%Y-%m-%d %H:%M:%S %z')"
+  if [[ "$line" =~ ^\[[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}\ [+-][0-9]{4}\] ]]; then
+    prefixed="$line"
+  else
+    prefixed="[$timestamp] $line"
+  fi
 
+  printf '%s\n' "$prefixed" >> "$COMBINED_LOG"
+  lower_line="$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$lower_line" =~ (error|failed|fatal|panic|no\ such\ file\ or\ directory|connection\ refused|permission\ denied|request_failed|could\ not|cannot\ find|not\ found) ]]; then
+    printf '%s\n' "$prefixed" >> "$ERROR_LOG"
+  elif [[ "$lower_line" =~ (warning|warn|blocking\ waiting\ for\ file\ lock) ]]; then
+    printf '%s\n' "$prefixed" >> "$WARN_LOG"
+  else
+    printf '%s\n' "$prefixed" >> "$INFO_LOG"
+  fi
+done
+
+: <<'DISABLED_AWK_LOG_ROUTER'
+awk -v combined="$COMBINED_LOG" -v info="$INFO_LOG" -v warn="$WARN_LOG" -v error="$ERROR_LOG" '
 function lower(text,    out, i, ch) {
   out = ""
   for (i = 1; i <= length(text); i++) {
@@ -64,3 +79,4 @@ function write_line(path, line) {
   }
 }
 ' 
+DISABLED_AWK_LOG_ROUTER

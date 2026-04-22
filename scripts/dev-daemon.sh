@@ -2,13 +2,28 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-RUNNER="$ROOT_DIR/scripts/dev-daemon-runner.sh"
+DAEMON_MANIFEST="$ROOT_DIR/core/daemon/Cargo.toml"
+DAEMON_BIN="$ROOT_DIR/core/daemon/target/debug/autodev-daemon"
 LOG_BASE="autodev-daemon"
 
-if [[ ! -x "$RUNNER" ]]; then
-  echo "Missing daemon runner: $RUNNER" >&2
-  exit 1
-fi
+export PATH="/opt/homebrew/bin:/opt/homebrew/opt/rust/bin:/usr/local/bin:$HOME/.cargo/bin:$PATH"
+
+resolve_cargo() {
+  local candidates=(
+    "/opt/homebrew/bin/cargo"
+    "/usr/local/bin/cargo"
+    "$HOME/.cargo/bin/cargo"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  command -v cargo
+}
 
 load_env_file() {
   local env_file="$1"
@@ -51,4 +66,11 @@ if pgrep -x autodev-daemon >/dev/null 2>&1; then
 fi
 
 mkdir -p "$ROOT_DIR/logs/$LOG_BASE"
-exec nohup "$RUNNER"
+CARGO_BIN="$(resolve_cargo)"
+if [[ -z "${CARGO_BIN:-}" ]]; then
+  echo "cargo not found" >>"$ROOT_DIR/logs/$LOG_BASE/error.log"
+  exit 1
+fi
+
+"$CARGO_BIN" build --manifest-path "$DAEMON_MANIFEST" >>"$ROOT_DIR/logs/$LOG_BASE/combined.log" 2>&1
+nohup "$DAEMON_BIN" >>"$ROOT_DIR/logs/$LOG_BASE/combined.log" 2>&1 &

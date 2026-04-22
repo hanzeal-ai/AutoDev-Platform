@@ -27,8 +27,12 @@ extension IPCContract {
         static let addCreationMaterialsSuccess = "command.add_creation_materials.ok"
         static let confirmFeasibilityCommand = "command.confirm_feasibility"
         static let confirmFeasibilitySuccess = "command.confirm_feasibility.ok"
+        static let advanceProjectStageCommand = "command.advance_project_stage"
+        static let advanceProjectStageSuccess = "command.advance_project_stage.ok"
         static let planDevelopmentCommand = "command.plan_development"
         static let planDevelopmentSuccess = "command.plan_development.ok"
+        static let generateProjectStageAICommand = "command.generate_project_stage_ai"
+        static let generateProjectStageAISuccess = "command.generate_project_stage_ai.ok"
 
         static let error = "error"
     }

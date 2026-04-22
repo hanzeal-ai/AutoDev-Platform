@@ -62,7 +62,7 @@ pub(super) fn prd() -> StageDefaults {
         risk_items: vec!["范围膨胀", "需求不完整", "依赖未确认"],
         event_flow: vec!["PRD 生成", "PRD 调整", "用户确认"],
         primary_action: "确认 PRD",
-        secondary_actions: vec!["回退立项", "进入 UI"],
+        secondary_actions: vec![],
         downloads: vec![StageDownloadDefaults {
             id: "prd-snapshot",
             title: "PRD 快照",
@@ -93,8 +93,8 @@ pub(super) fn ui() -> StageDefaults {
         ]),
         risk_items: vec!["交互冲突", "信息架构不清", "视觉未定稿"],
         event_flow: vec!["页面结构生成", "交互更新", "设计确认"],
-        primary_action: "确认 UI 方案",
-        secondary_actions: vec!["回退 PRD", "进入研发"],
+        primary_action: "跳过 UI，进入研发",
+        secondary_actions: vec!["继续完善 UI"],
         downloads: vec![StageDownloadDefaults {
             id: "ui-snapshot",
             title: "UI 方案快照",
@@ -290,7 +290,7 @@ pub(super) fn testing() -> StageDefaults {
         risk_items: vec!["关键失败项", "阻塞未清", "质量未达标"],
         event_flow: vec!["测试启动", "失败记录", "回归通过"],
         primary_action: "确认发布",
-        secondary_actions: vec!["重新测试", "回退研发"],
+        secondary_actions: vec![],
         downloads: vec![
             StageDownloadDefaults {
                 id: "test-report",
@@ -334,7 +334,7 @@ pub(super) fn release() -> StageDefaults {
         risk_items: vec!["发布阻塞", "检查项未通过", "回滚风险"],
         event_flow: vec!["发布准备", "发布开始", "回滚执行"],
         primary_action: "确认发布",
-        secondary_actions: vec!["暂停发布", "执行回滚"],
+        secondary_actions: vec![],
         downloads: vec![
             StageDownloadDefaults {
                 id: "release-record",

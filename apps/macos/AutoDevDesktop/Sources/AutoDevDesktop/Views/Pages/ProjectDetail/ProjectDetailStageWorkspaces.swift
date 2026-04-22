@@ -2,7 +2,7 @@ import SwiftUI
 
 extension ProjectDetailPage {
     @ViewBuilder
-    func detailStageWorkspace(project: DeliveryProjectItem, detail: DeliveryExecutionDetail) -> some View {
+    func detailStageWorkspace(project: DeliveryProjectItem, detail: DeliveryExecutionDetail?) -> some View {
         switch viewModel.state.activeDetailStage {
         case .feasibility:
             feasibilityWorkspace(project: project, detail: detail)

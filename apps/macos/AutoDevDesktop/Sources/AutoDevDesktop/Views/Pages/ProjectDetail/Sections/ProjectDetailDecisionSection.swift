@@ -12,11 +12,13 @@ struct ProjectDetailDecisionSection: View {
                     MetricPill(title: "状态", value: detail.status.rawValue, valueColor: detail.status.color)
                     MetricPill(title: "更新时间", value: detail.updatedAt)
                     Spacer()
-                    ProjectDetailActionCluster(
-                        viewModel: viewModel,
-                        primaryAction: viewModel.state.selectedStagePrimaryAction,
-                        secondaryActions: viewModel.state.selectedStageSecondaryActions
-                    )
+                    if detail.status != .completed {
+                        ProjectDetailActionCluster(
+                            viewModel: viewModel,
+                            primaryAction: viewModel.state.selectedStagePrimaryAction,
+                            secondaryActions: viewModel.state.selectedStageSecondaryActions
+                        )
+                    }
                 }
                 Text(viewModel.state.selectedDetailDecisionQuestion)
                     .font(.subheadline.weight(.semibold))

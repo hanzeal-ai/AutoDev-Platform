@@ -31,7 +31,9 @@ struct DevelopmentActiveUnitCard: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 DevelopmentMetaLine(label: "Agent", value: unit.agentRole)
-                DevelopmentMetaLine(label: "当前产物", value: unit.currentOutput ?? "待生成")
+                if let currentOutput = unit.currentOutput, !currentOutput.isEmpty {
+                    DevelopmentMetaLine(label: "当前产物", value: currentOutput)
+                }
                 DevelopmentMetaLine(label: "下一步", value: unit.nextStep)
             }
 
@@ -153,7 +155,9 @@ private struct DevelopmentWorkUnitDetailSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 DevelopmentMetaLine(label: "状态", value: unit.status.rawValue)
                 DevelopmentMetaLine(label: "前置单元", value: unit.dependsOn.isEmpty ? "无" : unit.dependsOn.joined(separator: "、"))
-                DevelopmentMetaLine(label: "当前产物", value: unit.currentOutput ?? "待生成")
+                if let currentOutput = unit.currentOutput, !currentOutput.isEmpty {
+                    DevelopmentMetaLine(label: "当前产物", value: currentOutput)
+                }
                 DevelopmentMetaLine(label: "下一步", value: unit.nextStep)
             }
 
@@ -215,18 +219,15 @@ private struct DevelopmentUnitDownloads: View {
             ForEach(downloads) { item in
                 switch item.availability {
                 case .ready, .viewOnly:
-                    Button(item.title) {
-                        viewModel.openStageDownload(item)
+                    if item.filePath?.isEmpty == false {
+                        Button(item.title) {
+                            viewModel.openStageDownload(item)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 case .pending:
-                    Text("\(item.title) 待生成")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(nsColor: .windowBackgroundColor), in: Capsule())
+                    EmptyView()
                 }
             }
         }

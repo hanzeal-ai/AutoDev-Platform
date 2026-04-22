@@ -38,6 +38,21 @@ extension DaemonClient {
         ["project_id": projectID]
     }
 
+    static func advanceProjectStagePayload(projectID: String, action: String) -> [String: Any] {
+        [
+            "project_id": projectID,
+            "action": action,
+        ]
+    }
+
+    static func generateProjectStageAIPayload(projectID: String, stage: String?) -> [String: Any] {
+        var payload: [String: Any] = ["project_id": projectID]
+        if let stage {
+            payload["stage"] = stage
+        }
+        return payload
+    }
+
     static func encodeRequestLine(messageType: String, payload: [String: Any]) throws -> Data {
         let request = IPCRequestEnvelope.make(messageType: messageType, payload: payload)
         let body = try JSONSerialization.data(withJSONObject: request.jsonObject(), options: [])

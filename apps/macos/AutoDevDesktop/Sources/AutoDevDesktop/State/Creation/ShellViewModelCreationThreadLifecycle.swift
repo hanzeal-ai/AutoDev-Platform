@@ -15,8 +15,8 @@ extension ShellViewModel {
                     let result = try await daemonClient.createCreationThread()
                     try await refreshCreationThreads()
                     if let threadID = result.threadId.flatMap(UUID.init(uuidString:)) {
-                        state.selectCreationThread(threadID)
                         state.openProjectCreation()
+                        state.selectCreationThread(threadID)
                     }
                 } catch {
                     state.apply(operationError: error, context: "创建线程")

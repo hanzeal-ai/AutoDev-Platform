@@ -26,7 +26,6 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn initialize_store(paths: &runtime::RuntimePaths) -> Result<(), Box<dyn Error>> {
     let store = store::Store::open(paths).map_err(boxed_error)?;
     store.init_schema().map_err(boxed_error)?;
-    store.seed_if_empty().map_err(boxed_error)?;
     Ok(())
 }
 

@@ -28,31 +28,38 @@ extension ShellViewState {
     var selectedStageSecondaryActions: [String] {
         let actions = selectedExecutionDetail?.secondaryActions ?? []
         if !actions.isEmpty {
-            return Array(actions.prefix(2))
+            return Array(Self.supportedSecondaryActions(actions, for: activeDetailStage).prefix(2))
         }
         return Self.defaultSecondaryActions(for: activeDetailStage)
+    }
+
+    private static func supportedSecondaryActions(_ actions: [String], for stage: DeliveryLifecycleStage) -> [String] {
+        let blocked = ["回退立项", "回退 PRD", "回退研发", "暂停发布", "执行回滚", "重新测试"]
+        return actions.filter { action in
+            !blocked.contains(action) && defaultSecondaryActions(for: stage).contains(action)
+        }
     }
 
     var selectedStageDownloads: [StageDownloadItem] {
         var items = selectedExecutionDetail?.downloads ?? []
         if activeDetailStage == .feasibility {
-            items.insert(
-                StageDownloadItem(
+            if let reportPath = selectedFeasibilityReportDownloadPath, !reportPath.isEmpty {
+                items.insert(StageDownloadItem(
                     id: UUID(),
                     title: "可行性报告",
                     category: .stageSnapshot,
-                    availability: selectedFeasibilityReportDownloadPath == nil ? .pending : .ready,
-                    filePath: selectedFeasibilityReportDownloadPath
-                ),
-                at: 0
-            )
-            items.append(contentsOf: selectedFeasibilityMaterials.map { material in
-                StageDownloadItem(
+                    availability: .ready,
+                    filePath: reportPath
+                ), at: 0)
+            }
+            items.append(contentsOf: selectedFeasibilityMaterials.compactMap { material in
+                guard let path = material.downloadPath, !path.isEmpty else { return nil }
+                return StageDownloadItem(
                     id: material.id,
                     title: material.name,
                     category: .rawInput,
-                    availability: material.downloadPath == nil ? .pending : .ready,
-                    filePath: material.downloadPath
+                    availability: .ready,
+                    filePath: path
                 )
             })
         }

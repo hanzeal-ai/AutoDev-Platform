@@ -10,3 +10,12 @@ autodev-daemon listening on /Users/sanmws/Library/Application Support/com.sanmws
 awk: illegal byte sequence è
  input record number 4, file 
  source line number 6
+awk: calling undefined function systime
+ input record number 1, file 
+ source line number 3
+awk: calling undefined function systime
+ input record number 1, file 
+ source line number 3
+awk: calling undefined function systime
+ input record number 1, file 
+ source line number 3

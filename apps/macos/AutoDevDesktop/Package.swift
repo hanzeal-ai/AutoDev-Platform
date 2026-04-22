@@ -12,7 +12,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AutoDevDesktop",
-            path: "Sources/AutoDevDesktop"
+            path: "Sources/AutoDevDesktop",
+            sources: ["."]
         ),
         .testTarget(
             name: "AutoDevDesktopTests",

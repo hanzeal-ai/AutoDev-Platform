@@ -1,55 +1,69 @@
 import SwiftUI
 
 extension ProjectDetailPage {
-    func releaseWorkspace(detail: DeliveryExecutionDetail) -> some View {
-        let lines = detail.inputContexts
+    func releaseWorkspace(detail: DeliveryExecutionDetail?) -> some View {
+        let lines = detail?.inputContexts ?? []
+        let artifacts = detail?.outputArtifacts ?? []
         let releaseDownloads = stageDownloads(in: [.auditArchive])
+        let versionInfo = AutoDevTextSupport.value(for: "版本信息", in: lines)
+        let releaseItems = AutoDevTextSupport.compactItems([
+            AutoDevTextSupport.value(for: "发布准备", in: lines),
+            AutoDevTextSupport.value(for: "检查项", in: lines),
+        ])
+        let releaseStatus = AutoDevTextSupport.value(for: "当前发布状态", in: lines)
+        let releaseWindow = AutoDevTextSupport.value(for: "上线窗口", in: lines)
+        let rollback = AutoDevTextSupport.value(for: "回滚条件", in: lines)
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
+            StageAIExecutionProgressView(
+                viewModel: viewModel,
+                stage: .release,
+                detail: detail,
+                downloads: releaseDownloads
+            )
+
             stageModule(
                 "发布准备",
-                when: AutoDevTextSupport.value(for: "版本信息", in: lines) != nil
-                    || AutoDevTextSupport.value(for: "发布准备", in: lines) != nil
-                    || AutoDevTextSupport.value(for: "检查项", in: lines) != nil
+                when: versionInfo != nil || !releaseItems.isEmpty
             ) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let version = AutoDevTextSupport.value(for: "版本信息", in: lines) {
-                        KeyValueRow(key: "版本信息", value: version)
+                    if let versionInfo {
+                        KeyValueRow(key: "版本信息", value: versionInfo)
                     }
-                    StageBulletsView(
-                        items: AutoDevTextSupport.compactItems([
-                            AutoDevTextSupport.value(for: "发布准备", in: lines),
-                            AutoDevTextSupport.value(for: "检查项", in: lines),
-                        ])
-                    )
+                    if !releaseItems.isEmpty {
+                        StageBulletsView(items: releaseItems)
+                    }
                 }
             }
 
             stageModule(
                 "发布状态",
-                when: AutoDevTextSupport.value(for: "当前发布状态", in: lines) != nil
-                    || AutoDevTextSupport.value(for: "上线窗口", in: lines) != nil
-                    || !AutoDevTextSupport.filteredArtifacts(detail.outputArtifacts, contains: "环境目标").isEmpty
+                when: releaseStatus != nil || releaseWindow != nil || !artifacts.isEmpty
             ) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let status = AutoDevTextSupport.value(for: "当前发布状态", in: lines) {
-                        KeyValueRow(key: "当前发布状态", value: status)
+                    if let releaseStatus {
+                        KeyValueRow(key: "当前发布状态", value: releaseStatus)
                     }
-                    if let window = AutoDevTextSupport.value(for: "上线窗口", in: lines) {
-                        KeyValueRow(key: "上线窗口", value: window)
+                    if let releaseWindow {
+                        KeyValueRow(key: "上线窗口", value: releaseWindow)
                     }
-                    StageBulletsView(items: AutoDevTextSupport.filteredArtifacts(detail.outputArtifacts, contains: "环境目标"))
+                    let envTargets = AutoDevTextSupport.filteredArtifacts(artifacts, contains: "环境目标")
+                    if !envTargets.isEmpty {
+                        StageBulletsView(items: envTargets)
+                    }
                 }
             }
 
-            stageModule("回滚条件", when: AutoDevTextSupport.value(for: "回滚条件", in: lines) != nil || !releaseDownloads.isEmpty) {
+            stageModule("回滚条件", when: rollback != nil || !releaseDownloads.isEmpty) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let rollback = AutoDevTextSupport.value(for: "回滚条件", in: lines) {
+                    if let rollback {
                         Text(rollback)
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    StageDownloadListView(viewModel: viewModel, items: releaseDownloads)
+                    if !releaseDownloads.isEmpty {
+                        StageDownloadListView(viewModel: viewModel, items: releaseDownloads)
+                    }
                 }
             }
         }

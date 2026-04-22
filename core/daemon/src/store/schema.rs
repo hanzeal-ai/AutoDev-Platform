@@ -105,6 +105,20 @@ CREATE TABLE IF NOT EXISTS stage_events (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS stage_ai_runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  first_delta_at_ms INTEGER,
+  last_delta_at_ms INTEGER,
+  delta_count INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_projects_status_updated
 ON projects(status, updated_at_ms DESC);
 
@@ -128,6 +142,9 @@ ON stage_artifacts(project_id, stage, updated_at_ms DESC);
 
 CREATE INDEX IF NOT EXISTS idx_stage_events_lookup
 ON stage_events(project_id, stage, created_at_ms DESC);
+
+CREATE INDEX IF NOT EXISTS idx_stage_ai_runs_lookup
+ON stage_ai_runs(project_id, stage, updated_at_ms DESC);
 "#,
             )
             .map_err(|err| err.to_string())?;

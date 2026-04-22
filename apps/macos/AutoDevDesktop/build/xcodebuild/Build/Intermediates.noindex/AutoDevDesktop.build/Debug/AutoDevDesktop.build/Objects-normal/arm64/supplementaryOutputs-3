@@ -1,0 +1,100 @@
+{
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/State/ShellViewStateCreation.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateCreation.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateCreation.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateCreation.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateCreation.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateCreation.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/State/ShellViewStateDerived.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateDerived.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateDerived.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateDerived.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateDerived.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateDerived.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/State/ShellViewStateNavigation.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateNavigation.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateNavigation.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateNavigation.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateNavigation.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateNavigation.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/State/ShellViewStateStatus.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateStatus.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateStatus.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateStatus.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateStatus.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ShellViewStateStatus.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/CreationComposer.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationComposer.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationComposer.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationComposer.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationComposer.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationComposer.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Foundation/CardComponents.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CardComponents.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CardComponents.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CardComponents.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CardComponents.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CardComponents.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Foundation/InfoComponents.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/InfoComponents.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/InfoComponents.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/InfoComponents.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/InfoComponents.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/InfoComponents.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/ProjectLibrarySearchField.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectLibrarySearchField.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectLibrarySearchField.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectLibrarySearchField.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectLibrarySearchField.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectLibrarySearchField.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Report/ReportSections.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ReportSections.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ReportSections.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ReportSections.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ReportSections.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ReportSections.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Rows/CreationRows.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationRows.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationRows.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationRows.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationRows.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/CreationRows.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Rows/ProjectRows.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectRows.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectRows.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectRows.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectRows.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/ProjectRows.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Stage/StageDownloadListView.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageDownloadListView.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageDownloadListView.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageDownloadListView.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageDownloadListView.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageDownloadListView.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Components/Stage/StageListViews.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageListViews.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageListViews.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageListViews.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageListViews.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/StageListViews.swiftdeps"
+  },
+  "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/Views/Layout/AppHeader.swift" : {
+    "const-values" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/AppHeader.swiftconstvalues",
+    "dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/AppHeader.d",
+    "diagnostics" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/AppHeader.dia",
+    "object" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/AppHeader.o",
+    "swift-dependencies" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/AutoDevDesktop.build/Debug/AutoDevDesktop.build/Objects-normal/arm64/AppHeader.swiftdeps"
+  }
+}

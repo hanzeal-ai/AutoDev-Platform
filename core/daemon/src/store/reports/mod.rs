@@ -2,7 +2,7 @@ mod chat;
 mod deepseek;
 mod draft;
 mod file;
-mod llm;
+pub(super) mod llm;
 mod update;
 
 use super::{Store, StoreResult};

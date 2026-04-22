@@ -11,15 +11,8 @@ extension ShellViewState {
 
     mutating func openProjectCreation() {
         route = .projectCreation
-        if selectedCreationThreadID == nil {
-            if let activeIndex = creationThreads.firstIndex(where: { !$0.isArchived }) {
-                selectedCreationThreadID = creationThreads[activeIndex].id
-                selectedCreationThreadIndex = activeIndex
-            } else {
-                selectedCreationThreadID = nil
-                selectedCreationThreadIndex = nil
-            }
-        }
+        selectedCreationThreadID = nil
+        selectedCreationThreadIndex = nil
     }
 
     mutating func openProjectDetail(projectID: UUID, from source: ProjectDetailBackTarget) {

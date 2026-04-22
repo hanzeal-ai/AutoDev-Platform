@@ -6,6 +6,7 @@ final class ShellViewModel: ObservableObject {
     @Published var isChecking: Bool = false
     @Published var isConfirmingFeasibility: Bool = false
     @Published var isPlanningDevelopment: Bool = false
+    @Published var isGeneratingStageAI: Bool = false
     @Published var isSendingCreationMessage: Bool = false
     @Published private(set) var transientCreationMessagesByThread: [UUID: [CreationConversationMessage]] = [:]
 
@@ -14,7 +15,7 @@ final class ShellViewModel: ObservableObject {
     let autoHealthCheck: Bool
     var hasLoaded = false
     var detailRefreshTask: Task<Void, Never>?
-    var developmentSimulationTask: Task<Void, Never>?
+    var stageAIRefreshTask: Task<Void, Never>?
 
     init(
         daemonClient: DaemonQuerying = DaemonClient(),

@@ -4,7 +4,6 @@ mod overview;
 mod projects;
 mod reports;
 mod schema;
-mod seed;
 mod threads;
 
 use crate::runtime::RuntimePaths;

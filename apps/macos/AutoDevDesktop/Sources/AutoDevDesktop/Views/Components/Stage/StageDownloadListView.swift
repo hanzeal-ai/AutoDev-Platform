@@ -35,12 +35,7 @@ struct StageDownloadListView: View {
                             }
                             .buttonStyle(.bordered)
                         case .pending:
-                            Text("待生成")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
+                            EmptyView()
                         }
                     }
                     .padding(8)

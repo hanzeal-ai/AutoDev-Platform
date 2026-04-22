@@ -6,8 +6,7 @@ struct ProjectDetailLifecycleSection: View {
     var body: some View {
         DashboardCard(title: "生命周期轨道") {
             ProjectDetailLifecycleTrack(
-                current: viewModel.state.activeDetailStage,
-                onSelect: { viewModel.selectDetailStage($0) }
+                current: viewModel.state.selectedProject?.lifecycleStage ?? viewModel.state.activeDetailStage
             )
         }
     }
@@ -15,7 +14,6 @@ struct ProjectDetailLifecycleSection: View {
 
 private struct ProjectDetailLifecycleTrack: View {
     let current: DeliveryLifecycleStage
-    let onSelect: (DeliveryLifecycleStage) -> Void
 
     var body: some View {
         let stages = DeliveryLifecycleStage.allCases
@@ -25,27 +23,25 @@ private struct ProjectDetailLifecycleTrack: View {
                     let isCurrent = stage == current
                     let isReached = stage.order <= current.order
 
-                    Button(action: { onSelect(stage) }) {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(isReached ? Color.accentColor : Color.secondary.opacity(0.35))
-                                .frame(width: 7, height: 7)
-                            Text(stage.rawValue)
-                                .font(.caption.weight(.medium))
-                                .foregroundColor(isCurrent ? .primary : .secondary)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                .fill(isCurrent ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                .stroke(isCurrent ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
-                        )
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isReached ? Color.accentColor : Color.secondary.opacity(0.35))
+                            .frame(width: 7, height: 7)
+                        Text(stage.rawValue)
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(isCurrent ? .primary : .secondary)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 999, style: .continuous)
+                            .fill(isCurrent ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 999, style: .continuous)
+                            .stroke(isCurrent ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
+                    )
+                    .accessibilityLabel("\(stage.rawValue)\(isCurrent ? "，当前阶段" : "")")
 
                     if index < stages.count - 1 {
                         Capsule(style: .circular)

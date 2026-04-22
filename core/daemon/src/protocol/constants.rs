@@ -25,7 +25,12 @@ pub const MESSAGE_COMMAND_ADD_CREATION_MATERIALS: &str = "command.add_creation_m
 pub const MESSAGE_COMMAND_ADD_CREATION_MATERIALS_OK: &str = "command.add_creation_materials.ok";
 pub const MESSAGE_COMMAND_CONFIRM_FEASIBILITY: &str = "command.confirm_feasibility";
 pub const MESSAGE_COMMAND_CONFIRM_FEASIBILITY_OK: &str = "command.confirm_feasibility.ok";
+pub const MESSAGE_COMMAND_ADVANCE_PROJECT_STAGE: &str = "command.advance_project_stage";
+pub const MESSAGE_COMMAND_ADVANCE_PROJECT_STAGE_OK: &str = "command.advance_project_stage.ok";
 pub const MESSAGE_COMMAND_PLAN_DEVELOPMENT: &str = "command.plan_development";
 pub const MESSAGE_COMMAND_PLAN_DEVELOPMENT_OK: &str = "command.plan_development.ok";
+pub const MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI: &str = "command.generate_project_stage_ai";
+pub const MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI_OK: &str =
+    "command.generate_project_stage_ai.ok";
 
 pub const MESSAGE_ERROR: &str = "error";

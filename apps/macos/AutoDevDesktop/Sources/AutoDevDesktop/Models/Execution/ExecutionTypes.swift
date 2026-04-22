@@ -41,6 +41,19 @@ struct DeliveryEventItem: Identifiable, Equatable {
     var detail: String
 }
 
+struct DeliveryStageAIRun: Equatable {
+    var id: String
+    var status: String
+    var startedAt: String
+    var updatedAt: String
+    var deltaCount: Int
+    var errorMessage: String?
+
+    var isActive: Bool {
+        ["dispatched", "waiting_first_delta", "streaming", "post_processing"].contains(status)
+    }
+}
+
 struct DeliverySubTaskItem: Identifiable, Equatable {
     let id: String
     var title: String
@@ -77,6 +90,7 @@ struct DeliveryExecutionDetail: Equatable {
     var blockerReason: String?
     var needsUserIntervention: Bool
     var events: [DeliveryEventItem]
+    var aiRun: DeliveryStageAIRun?
     var riskItems: [String] = []
     var primaryAction: String = "继续"
     var secondaryActions: [String] = []

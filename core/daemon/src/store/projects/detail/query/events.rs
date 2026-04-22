@@ -13,10 +13,14 @@ pub(in crate::store::projects::detail) fn list_stage_events(
         .prepare(
             r#"
 SELECT id, title, detail, created_at_ms
-FROM stage_events
-WHERE project_id = ?1 AND stage = ?2
-ORDER BY created_at_ms DESC
-LIMIT 20
+FROM (
+  SELECT id, title, detail, created_at_ms
+  FROM stage_events
+  WHERE project_id = ?1 AND stage = ?2
+  ORDER BY created_at_ms DESC
+  LIMIT 50
+)
+ORDER BY created_at_ms ASC
 "#,
         )
         .map_err(|err| err.to_string())?;

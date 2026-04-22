@@ -53,6 +53,15 @@ enum DaemonBootstrapper {
             directory.deleteLastPathComponent()
         }
 
+        directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while directory.path != "/" {
+            let candidate = directory.appendingPathComponent("scripts/dev-daemon.sh")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+            directory.deleteLastPathComponent()
+        }
+
         return nil
     }
 }

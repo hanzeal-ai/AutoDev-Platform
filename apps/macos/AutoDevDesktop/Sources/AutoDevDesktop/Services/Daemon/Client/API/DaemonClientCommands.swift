@@ -39,7 +39,8 @@ extension DaemonClient {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.addCreationMessageCommand,
             payload: Self.addCreationMessagePayload(threadID: threadID, content: content),
-            expectedResponse: IPCContract.MessageType.addCreationMessageSuccess
+            expectedResponse: IPCContract.MessageType.addCreationMessageSuccess,
+            timeoutSeconds: 60
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
         }
@@ -57,7 +58,8 @@ extension DaemonClient {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.confirmFeasibilityCommand,
             payload: Self.threadIDPayload(threadID),
-            expectedResponse: IPCContract.MessageType.confirmFeasibilitySuccess
+            expectedResponse: IPCContract.MessageType.confirmFeasibilitySuccess,
+            timeoutSeconds: 60
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
         }
@@ -68,6 +70,28 @@ extension DaemonClient {
             messageType: IPCContract.MessageType.planDevelopmentCommand,
             payload: Self.planDevelopmentPayload(projectID: projectID),
             expectedResponse: IPCContract.MessageType.planDevelopmentSuccess
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
+        }
+    }
+
+    func advanceProjectStage(projectID: String, action: String) async throws -> DaemonCommandResult {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.advanceProjectStageCommand,
+            payload: Self.advanceProjectStagePayload(projectID: projectID, action: action),
+            expectedResponse: IPCContract.MessageType.advanceProjectStageSuccess,
+            timeoutSeconds: 60
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
+        }
+    }
+
+    func generateProjectStageAI(projectID: String, stage: String?) async throws -> DaemonCommandResult {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.generateProjectStageAICommand,
+            payload: Self.generateProjectStageAIPayload(projectID: projectID, stage: stage),
+            expectedResponse: IPCContract.MessageType.generateProjectStageAISuccess,
+            timeoutSeconds: 60
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
         }

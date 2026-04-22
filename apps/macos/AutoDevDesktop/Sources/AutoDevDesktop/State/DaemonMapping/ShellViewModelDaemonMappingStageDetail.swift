@@ -21,22 +21,26 @@ extension ShellViewModel {
             blockerReason: dto.blockerReason,
             needsUserIntervention: dto.needsUserIntervention,
             events: dto.events.compactMap { mapEvent($0) },
+            aiRun: dto.aiRun.map { mapStageAIRun($0) },
             riskItems: dto.riskItems,
             primaryAction: dto.primaryAction,
             secondaryActions: dto.secondaryActions,
-            downloads: downloads.isEmpty ? mapDownloads(stage: stage, artifacts: artifacts) : downloads,
+            downloads: downloads,
             workUnits: mapWorkUnits(dto.workUnits ?? [])
         )
     }
 
     private static func mapArtifact(_ dto: DaemonArtifact) -> DeliveryArtifactItem? {
         guard let id = UUID(uuidString: dto.id) else { return nil }
+        guard let filePath = dto.filePath?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !filePath.isEmpty
+        else { return nil }
         return DeliveryArtifactItem(
             id: id,
             name: dto.name,
             kind: dto.kind,
             updatedAt: dto.updatedAt,
-            filePath: dto.filePath
+            filePath: filePath
         )
     }
 
@@ -58,14 +62,28 @@ extension ShellViewModel {
         )
     }
 
+    private static func mapStageAIRun(_ dto: DaemonStageAIRun) -> DeliveryStageAIRun {
+        DeliveryStageAIRun(
+            id: dto.id,
+            status: dto.status,
+            startedAt: dto.startedAt,
+            updatedAt: dto.updatedAt,
+            deltaCount: dto.deltaCount,
+            errorMessage: dto.errorMessage
+        )
+    }
+
     private static func mapDownloads(_ downloads: [DaemonStageDownload]) -> [StageDownloadItem] {
-        downloads.map { dto in
-            StageDownloadItem(
+        downloads.compactMap { dto in
+            guard let filePath = dto.filePath?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !filePath.isEmpty
+            else { return nil }
+            return StageDownloadItem(
                 id: UUID(uuidString: dto.id) ?? UUID(),
                 title: dto.title,
                 category: downloadCategory(from: dto.category),
                 availability: downloadAvailability(from: dto.availability),
-                filePath: dto.filePath
+                filePath: filePath
             )
         }
     }

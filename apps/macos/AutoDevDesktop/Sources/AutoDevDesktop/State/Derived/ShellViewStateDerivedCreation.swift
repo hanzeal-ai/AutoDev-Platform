@@ -40,6 +40,9 @@ extension ShellViewState {
     }
 
     var selectedCreationThread: CreationThreadSession? {
+        guard selectedCreationThreadID != nil || selectedCreationThreadIndex != nil else {
+            return nil
+        }
         if
             let selectedCreationThreadIndex = selectedCreationThreadIndex,
             creationThreads.indices.contains(selectedCreationThreadIndex)

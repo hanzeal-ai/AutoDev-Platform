@@ -23,10 +23,24 @@ struct DaemonProjectStageDetail: Decodable {
     let blockerReason: String?
     let needsUserIntervention: Bool
     let events: [DaemonEvent]
+    let aiRun: DaemonStageAIRun?
     let primaryAction: String
     let secondaryActions: [String]
     let riskItems: [String]
     let eventFlow: [String]
+}
+
+struct DaemonStageAIRun: Decodable {
+    let id: String
+    let status: String
+    let startedAt: String
+    let updatedAt: String
+    let startedAtMs: Int64
+    let updatedAtMs: Int64
+    let firstDeltaAtMs: Int64?
+    let lastDeltaAtMs: Int64?
+    let deltaCount: Int
+    let errorMessage: String?
 }
 
 struct DaemonWorkUnit: Decodable {

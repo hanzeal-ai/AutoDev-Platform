@@ -16,7 +16,7 @@ extension ShellViewState {
         case .prd:
             return "确认 PRD"
         case .ui:
-            return "确认 UI 方案"
+            return "跳过 UI，进入研发"
         case .development:
             return "继续推进"
         case .testing:
@@ -33,15 +33,15 @@ extension ShellViewState {
         case .feasibility:
             return ["继续讨论", "补充资料"]
         case .prd:
-            return ["回退立项", "进入 UI"]
+            return []
         case .ui:
-            return ["回退 PRD", "进入研发"]
+            return ["继续完善 UI"]
         case .development:
-            return ["人工介入", "进入测试"]
+            return ["查看预览", "进入测试"]
         case .testing:
-            return ["重新测试", "回退研发"]
+            return []
         case .release:
-            return ["暂停发布", "执行回滚"]
+            return []
         case .maintenance:
             return ["触发新立项", "归档项目"]
         }

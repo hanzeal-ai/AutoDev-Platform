@@ -1,0 +1,64 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "a86eb617fbaa623d44bad8927570512b450edc672611de20772e6930b71d0ceb"
+    }
+  ],
+  "containerPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/AutoDevDesktop.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "hostTargetedPlatform" : null,
+      "platform" : "macosx",
+      "sdk" : "macosx26.4",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "arm64e",
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Products",
+      "derivedDataPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild",
+      "indexDataStoreFolderPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/sanmws/Documents/AI-AutoDev-Platform/apps/macos/AutoDevDesktop/build/xcodebuild/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+          "CODE_SIGNING_ALLOWED" : "NO"
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ACTION" : "build",
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "YES"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

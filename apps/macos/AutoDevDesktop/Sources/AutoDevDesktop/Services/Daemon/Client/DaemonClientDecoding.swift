@@ -5,6 +5,7 @@ extension DaemonClient {
         messageType: String,
         payload: [String: Any],
         expectedResponse: String,
+        timeoutSeconds: TimeInterval = 5,
         decode: @escaping ([String: Any]) throws -> T
     ) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
@@ -13,7 +14,8 @@ extension DaemonClient {
                     let responsePayload = try self.sendRequestSync(
                         messageType: messageType,
                         payload: payload,
-                        expectedResponse: expectedResponse
+                        expectedResponse: expectedResponse,
+                        timeoutSeconds: timeoutSeconds
                     )
                     let value = try decode(responsePayload)
                     continuation.resume(returning: value)
@@ -27,10 +29,15 @@ extension DaemonClient {
     func sendRequestSync(
         messageType: String,
         payload: [String: Any],
-        expectedResponse: String
+        expectedResponse: String,
+        timeoutSeconds: TimeInterval = 5
     ) throws -> [String: Any] {
         let line = try Self.encodeRequestLine(messageType: messageType, payload: payload)
-        let responseLine = try DaemonUnixSocketTransport.exchange(line: line, socketPath: socketPath)
+        let responseLine = try DaemonUnixSocketTransport.exchange(
+            line: line,
+            socketPath: socketPath,
+            timeoutSeconds: timeoutSeconds
+        )
         return try decodeResponsePayload(responseLine, expectedResponse: expectedResponse)
     }
 

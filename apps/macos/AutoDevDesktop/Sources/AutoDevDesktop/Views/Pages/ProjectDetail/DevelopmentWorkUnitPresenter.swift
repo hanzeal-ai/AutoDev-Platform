@@ -2,21 +2,17 @@ import Foundation
 
 enum DevelopmentWorkUnitPresenter {
     static func displayUnits(for detail: DeliveryExecutionDetail?) -> [DeliveryWorkUnitItem] {
-        guard let detail = detail else {
-            return placeholderWorkUnits
-        }
-        return displayUnits(for: detail)
+        detail?.workUnits ?? []
     }
 
     static func displayUnits(for detail: DeliveryExecutionDetail) -> [DeliveryWorkUnitItem] {
-        detail.workUnits.isEmpty ? placeholderWorkUnits : detail.workUnits
+        detail.workUnits
     }
 
-    static func activeUnit(in units: [DeliveryWorkUnitItem]) -> DeliveryWorkUnitItem {
+    static func activeUnit(in units: [DeliveryWorkUnitItem]) -> DeliveryWorkUnitItem? {
         units.first(where: { $0.status == .running })
             ?? units.first(where: { $0.status == .blocked || $0.status == .queued })
             ?? units.first
-            ?? placeholderWorkUnits[0]
     }
 
     static func subTasks(for unit: DeliveryWorkUnitItem) -> [DeliverySubTaskItem] {
@@ -64,76 +60,4 @@ enum DevelopmentWorkUnitPresenter {
         }
         return unit.status == .blocked ? .blocked : .queued
     }
-}
-
-private extension DevelopmentWorkUnitPresenter {
-    static let placeholderWorkUnits: [DeliveryWorkUnitItem] = [
-        DeliveryWorkUnitItem(
-            id: "requirement-analysis",
-            title: "前后端需求分析",
-            agentRole: "需求分析 Agent",
-            status: .running,
-            progress: 0.25,
-            dependsOn: [],
-            currentOutput: "需求拆分占位",
-            nextStep: "冻结需求边界后生成任务拆分",
-            downloads: []
-        ),
-        DeliveryWorkUnitItem(
-            id: "api-contract",
-            title: "接口契约与架构选择",
-            agentRole: "后端规划 Agent",
-            status: .blocked,
-            progress: 0,
-            dependsOn: ["requirement-analysis"],
-            currentOutput: nil,
-            nextStep: "等待需求分析完成",
-            downloads: [
-                StageDownloadItem(
-                    id: UUID(),
-                    title: "接口契约",
-                    category: .stageSnapshot,
-                    availability: .pending,
-                    filePath: nil
-                ),
-            ]
-        ),
-        DeliveryWorkUnitItem(
-            id: "frontend-backend-task-split",
-            title: "前后端任务拆分",
-            agentRole: "任务拆分 Agent",
-            status: .blocked,
-            progress: 0,
-            dependsOn: ["requirement-analysis", "api-contract"],
-            currentOutput: nil,
-            nextStep: "等待接口契约后拆分可执行任务",
-            downloads: [
-                StageDownloadItem(
-                    id: UUID(),
-                    title: "前端任务拆分",
-                    category: .stageSnapshot,
-                    availability: .pending,
-                    filePath: nil
-                ),
-                StageDownloadItem(
-                    id: UUID(),
-                    title: "后端任务拆分",
-                    category: .stageSnapshot,
-                    availability: .pending,
-                    filePath: nil
-                ),
-            ]
-        ),
-        DeliveryWorkUnitItem(
-            id: "implementation-review-test",
-            title: "编码、审查与测试循环",
-            agentRole: "实现与审查 Agent",
-            status: .blocked,
-            progress: 0,
-            dependsOn: ["frontend-backend-task-split"],
-            currentOutput: nil,
-            nextStep: "等待任务拆分完成后开始编码",
-            downloads: []
-        ),
-    ]
 }

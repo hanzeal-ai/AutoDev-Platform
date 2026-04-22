@@ -48,7 +48,9 @@ extension ShellViewModel {
             guard !Task.isCancelled, state.selectedExecutionDetailKey == requestKey else {
                 return
             }
-            state.executionDetails[requestKey] = Self.mapStageDetail(detail)
+            let mappedDetail = Self.mapStageDetail(detail)
+            state.executionDetails[requestKey] = mappedDetail
+            scheduleStageAIDetailPollingIfNeeded(detail: mappedDetail, requestKey: requestKey)
         } catch is CancellationError {
             return
         } catch {
@@ -59,6 +61,47 @@ extension ShellViewModel {
         }
     }
 
+    func generateAIForSelectedStage() {
+        guard dataMode == .liveDaemon else {
+            state.statusMessage = "预览模式不能触发后台 AI"
+            return
+        }
+        guard let requestKey = state.selectedExecutionDetailKey else {
+            state.statusMessage = "未选择阶段"
+            return
+        }
+        guard !isGeneratingStageAI else { return }
+
+        isGeneratingStageAI = true
+        state.statusMessage = "后台 AI 已启动..."
+        Task { @MainActor in
+            defer { isGeneratingStageAI = false }
+            do {
+                _ = try await daemonClient.generateProjectStageAI(
+                    projectID: requestKey.projectID.uuidString,
+                    stage: Self.stageKey(requestKey.stage)
+                )
+                guard state.selectedExecutionDetailKey == requestKey else { return }
+                state.statusMessage = "后台 AI 流式生成中..."
+                for _ in 0..<90 {
+                    await refreshSelectedProjectDetail()
+                    guard state.selectedExecutionDetailKey == requestKey else { return }
+                    if let detail = state.executionDetails[requestKey],
+                       !Self.stageAIGenerationActive(detail)
+                    {
+                        state.statusMessage = "后台 AI 已返回阶段数据"
+                        return
+                    }
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                }
+                state.statusMessage = "后台 AI 仍在运行，可稍后刷新查看"
+            } catch {
+                guard state.selectedExecutionDetailKey == requestKey else { return }
+                state.apply(operationError: error, context: "触发后台 AI")
+            }
+        }
+    }
+
     func openLocalPath(_ path: String) {
         let url = URL(fileURLWithPath: path)
         if FileManager.default.fileExists(atPath: url.path) {
@@ -66,5 +109,30 @@ extension ShellViewModel {
         } else {
             state.triggerStageAction("文件不存在：\(url.lastPathComponent)")
         }
+    }
+
+    private func scheduleStageAIDetailPollingIfNeeded(
+        detail: DeliveryExecutionDetail,
+        requestKey: ProjectExecutionDetailKey
+    ) {
+        stageAIRefreshTask?.cancel()
+        guard Self.stageAIGenerationActive(detail) else { return }
+        stageAIRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard self?.state.selectedExecutionDetailKey == requestKey else { return }
+                Task { @MainActor in
+                    await self?.refreshSelectedProjectDetail()
+                }
+            }
+        }
+    }
+
+    private static func stageAIGenerationActive(_ detail: DeliveryExecutionDetail) -> Bool {
+        if let aiRun = detail.aiRun {
+            return aiRun.isActive
+        }
+        return false
     }
 }
