@@ -53,7 +53,7 @@ private struct PreviewDaemonClient: DaemonQuerying {
         throw DaemonClientError.malformedResponse
     }
 
-    func advanceProjectStage(projectID _: String, action _: String) async throws -> DaemonCommandResult {
+    func advanceProjectStage(projectID _: String, action _: String, autoTriggerAI _: Bool) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
 

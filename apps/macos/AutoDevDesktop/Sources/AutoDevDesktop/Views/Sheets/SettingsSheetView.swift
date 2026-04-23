@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsSheetView: View {
     @ObservedObject var viewModel: ShellViewModel
@@ -9,7 +10,7 @@ struct SettingsSheetView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("设置")
                         .font(.title2.weight(.semibold))
-                    Text("界面偏好")
+                    Text("界面与存储偏好")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -42,6 +43,109 @@ struct SettingsSheetView: View {
                 .padding(.vertical, 6)
             }
 
+            GroupBox("文件存储位置") {
+                VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
+                    Picker(
+                        "存储位置",
+                        selection: Binding(
+                            get: { viewModel.state.storageLocationMode },
+                            set: { viewModel.setStorageLocationMode($0) }
+                        )
+                    ) {
+                        ForEach(StorageLocationMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if viewModel.state.storageLocationMode == .local {
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder")
+                                .foregroundColor(.secondary)
+                            Text(viewModel.state.localStoragePath)
+                                .font(.caption.monospaced())
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button("更改") {
+                                chooseLocalStoragePath()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        .padding(.top, 2)
+                    } else {
+                        HStack(spacing: 8) {
+                            Image(systemName: "cloud")
+                                .foregroundColor(.secondary)
+                            Text("云端存储将在后续版本接入")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
+            GroupBox("阶段推进策略") {
+                VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
+                    Picker(
+                        "自动化模式",
+                        selection: Binding(
+                            get: { viewModel.state.stageAutomation.mode },
+                            set: { viewModel.setStageAutomationMode($0) }
+                        )
+                    ) {
+                        ForEach(StageAutomationMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    switch viewModel.state.stageAutomation.mode {
+                    case .fullAuto:
+                        Text("所有阶段将自动推进，AI 完成后自动进入下一阶段，无需人工确认。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    case .allManual:
+                        Text("所有阶段都需要人工确认后才会推进，AI 不会自动触发。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    case .selective:
+                        Text("选择需要人工确认的阶段，未选择的阶段将自动推进。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(DeliveryLifecycleStage.allCases) { stage in
+                                Toggle(
+                                    stage.rawValue,
+                                    isOn: Binding(
+                                        get: { viewModel.state.stageAutomation.manualConfirmStages.contains(stage) },
+                                        set: { _ in viewModel.toggleManualConfirmStage(stage) }
+                                    )
+                                )
+                                .font(.subheadline)
+                            }
+                        }
+                        .padding(.top, 4)
+
+                        Toggle(
+                            "分步操作也需人工推进",
+                            isOn: Binding(
+                                get: { viewModel.state.stageAutomation.manualSubSteps },
+                                set: { viewModel.setManualSubSteps($0) }
+                            )
+                        )
+                        .font(.subheadline)
+                        .padding(.top, 4)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
             GroupBox("其他设置（占位）") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("通知偏好、快捷键与运行策略将在后续版本接入。")
@@ -54,6 +158,18 @@ struct SettingsSheetView: View {
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(minWidth: 520, minHeight: 320)
+        .frame(minWidth: 520, minHeight: 400)
+    }
+
+    private func chooseLocalStoragePath() {
+        let panel = NSOpenPanel()
+        panel.title = "选择文件存储位置"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.setLocalStoragePath(url.path)
+        }
     }
 }

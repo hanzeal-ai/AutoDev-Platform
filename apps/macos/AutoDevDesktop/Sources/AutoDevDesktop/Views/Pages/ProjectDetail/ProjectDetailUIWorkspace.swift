@@ -8,25 +8,15 @@ extension ProjectDetailPage {
         let flow = AutoDevTextSupport.value(for: "核心交互流", in: lines)
         let vision = AutoDevTextSupport.value(for: "视觉方向", in: lines)
         let confirmPoint = AutoDevTextSupport.value(for: "待确认设计点", in: lines)
-        let downloads = stageDownloads(in: [.stageSnapshot])
+        let downloads = stageDownloads(in: [.stageSnapshot, .rawInput, .auditArchive])
+        let artifacts = detail?.outputArtifacts ?? []
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
-            StageAIExecutionProgressView(
-                viewModel: viewModel,
-                stage: .ui,
-                detail: detail,
-                downloads: downloads
-            )
-
-            stageModule("UI 方案摘要", when: detail?.objective.isEmpty == false) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let objective = detail?.objective, !objective.isEmpty {
-                        KeyValueRow(key: "目标", value: objective)
-                    }
-                }
+            stageModule("进度轨迹", when: !(detail?.stepProgress.isEmpty ?? true)) {
+                StageStepProgressBar(steps: detail?.stepProgress ?? [])
             }
 
-            stageModule("页面结构", when: map != nil || components != nil) {
+            stageModule("设计方案", when: map != nil || components != nil || flow != nil || vision != nil) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
                     if let map {
                         KeyValueRow(key: "页面地图", value: map)
@@ -34,11 +24,6 @@ extension ProjectDetailPage {
                     if let components {
                         KeyValueRow(key: "关键组件", value: components)
                     }
-                }
-            }
-
-            stageModule("关键交互", when: flow != nil || vision != nil) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
                     if let flow {
                         KeyValueRow(key: "核心交互流", value: flow)
                     }
@@ -48,12 +33,13 @@ extension ProjectDetailPage {
                 }
             }
 
-            stageModule("待确认设计点", when: confirmPoint != nil || !downloads.isEmpty) {
+            stageModule("阶段产物", when: confirmPoint != nil || !artifacts.isEmpty || !downloads.isEmpty) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
                     if let confirmPoint {
-                        Text(confirmPoint)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        KeyValueRow(key: "待确认设计点", value: confirmPoint)
+                    }
+                    if !artifacts.isEmpty {
+                        StageArtifactListView(viewModel: viewModel, items: artifacts)
                     }
                     if !downloads.isEmpty {
                         StageDownloadListView(viewModel: viewModel, items: downloads)

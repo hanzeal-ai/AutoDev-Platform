@@ -3,30 +3,27 @@ import SwiftUI
 extension ProjectDetailPage {
     func maintenanceWorkspace(detail: DeliveryExecutionDetail?) -> some View {
         let lines = detail?.inputContexts ?? []
-        let maintenanceDownloads = stageDownloads(in: [.auditArchive])
+        let maintenanceDownloads = stageDownloads(in: [.stageSnapshot, .auditArchive])
+        let artifacts = detail?.outputArtifacts ?? []
         let health = AutoDevTextSupport.value(for: "运行健康", in: lines)
         let feedbackItems = AutoDevTextSupport.compactItems([
             AutoDevTextSupport.value(for: "问题反馈", in: lines),
             AutoDevTextSupport.value(for: "已处理问题", in: lines),
         ])
-        let riskSignal = AutoDevTextSupport.value(for: "风险信号", in: lines)
         let nextSuggestion = AutoDevTextSupport.value(for: "下一轮优化建议", in: lines)
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
-            StageAIExecutionProgressView(
-                viewModel: viewModel,
-                stage: .maintenance,
-                detail: detail,
-                downloads: maintenanceDownloads
-            )
+            stageModule("进度轨迹", when: !(detail?.stepProgress.isEmpty ?? true)) {
+                StageStepProgressBar(steps: detail?.stepProgress ?? [])
+            }
 
             stageModule(
-                "运行反馈",
+                "运行状态",
                 when: health != nil || !feedbackItems.isEmpty
             ) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
                     if let health {
-                        KeyValueRow(key: "运行健康", value: health)
+                        MetricPill(title: "运行健康", value: health, valueColor: .green)
                     }
                     if !feedbackItems.isEmpty {
                         StageBulletsView(items: feedbackItems)
@@ -34,25 +31,18 @@ extension ProjectDetailPage {
                 }
             }
 
-            stageModule("风险信号", when: riskSignal != nil || detail?.riskItems.isEmpty == false) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let riskSignal {
-                        Text(riskSignal)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    if let riskItems = detail?.riskItems, !riskItems.isEmpty {
-                        StageBulletsView(items: riskItems)
-                    }
+            stageModule("迭代建议", when: nextSuggestion != nil) {
+                if let suggestion = nextSuggestion {
+                    Text(suggestion)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
-            stageModule("下一轮建议", when: nextSuggestion != nil || !maintenanceDownloads.isEmpty) {
+            stageModule("阶段产物", when: !artifacts.isEmpty || !maintenanceDownloads.isEmpty) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let nextSuggestion {
-                        Text(nextSuggestion)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    if !artifacts.isEmpty {
+                        StageArtifactListView(viewModel: viewModel, items: artifacts)
                     }
                     if !maintenanceDownloads.isEmpty {
                         StageDownloadListView(viewModel: viewModel, items: maintenanceDownloads)

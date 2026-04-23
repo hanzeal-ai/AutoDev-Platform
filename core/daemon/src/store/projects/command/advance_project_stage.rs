@@ -9,6 +9,7 @@ impl Store {
         &self,
         project_id: &str,
         action: Option<&str>,
+        auto_trigger_ai: bool,
     ) -> StoreResult<Value> {
         let project_id = project_id.trim().to_lowercase();
         let now = now_ms();
@@ -75,15 +76,17 @@ WHERE id = ?1
             )
             .map_err(|err| err.to_string())?;
 
-        if let Err(reason) = self.generate_project_stage_ai(&project_id, Some(next_stage)) {
-            logger::error_fields(
-                "auto stage ai trigger failed",
-                &[
-                    ("project_id", project_id.clone()),
-                    ("stage", next_stage.to_string()),
-                    ("reason", reason),
-                ],
-            );
+        if auto_trigger_ai {
+            if let Err(reason) = self.generate_project_stage_ai(&project_id, Some(next_stage)) {
+                logger::error_fields(
+                    "auto stage ai trigger failed",
+                    &[
+                        ("project_id", project_id.clone()),
+                        ("stage", next_stage.to_string()),
+                        ("reason", reason),
+                    ],
+                );
+            }
         }
 
         Ok(json!({

@@ -19,6 +19,9 @@ struct ShellViewState {
     var creationInputInsertionRequest: CreationInputInsertionRequest?
     var isSettingsPresented: Bool
     var appearanceMode: AppearanceMode
+    var storageLocationMode: StorageLocationMode
+    var localStoragePath: String
+    var stageAutomation: StageAutomationConfig
     var projects: [DeliveryProjectItem]
     var managedAlerts: [ManagedAlertItem]
     var progressNotices: [ProgressNoticeItem]

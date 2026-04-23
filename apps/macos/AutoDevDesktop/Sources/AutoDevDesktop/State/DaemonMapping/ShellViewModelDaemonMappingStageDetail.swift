@@ -32,15 +32,13 @@ extension ShellViewModel {
 
     private static func mapArtifact(_ dto: DaemonArtifact) -> DeliveryArtifactItem? {
         guard let id = UUID(uuidString: dto.id) else { return nil }
-        guard let filePath = dto.filePath?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !filePath.isEmpty
-        else { return nil }
+        let filePath = dto.filePath?.trimmingCharacters(in: .whitespacesAndNewlines)
         return DeliveryArtifactItem(
             id: id,
             name: dto.name,
             kind: dto.kind,
             updatedAt: dto.updatedAt,
-            filePath: filePath
+            filePath: (filePath?.isEmpty == false) ? filePath : nil
         )
     }
 
@@ -74,16 +72,15 @@ extension ShellViewModel {
     }
 
     private static func mapDownloads(_ downloads: [DaemonStageDownload]) -> [StageDownloadItem] {
-        downloads.compactMap { dto in
-            guard let filePath = dto.filePath?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !filePath.isEmpty
-            else { return nil }
+        downloads.map { dto in
+            let filePath = dto.filePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let hasPath = filePath?.isEmpty == false
             return StageDownloadItem(
                 id: UUID(uuidString: dto.id) ?? UUID(),
                 title: dto.title,
                 category: downloadCategory(from: dto.category),
-                availability: downloadAvailability(from: dto.availability),
-                filePath: filePath
+                availability: hasPath ? downloadAvailability(from: dto.availability) : .pending,
+                filePath: hasPath ? filePath : nil
             )
         }
     }

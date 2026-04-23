@@ -14,6 +14,18 @@ struct ProjectDetailPage: View {
                     }
                     ProjectDetailLifecycleSection(viewModel: viewModel)
 
+                    if viewModel.state.activeDetailStage != .feasibility,
+                       let detail = viewModel.state.selectedExecutionDetail
+                    {
+                        let stageDownloads = viewModel.state.selectedStageDownloads
+                        StageAIExecutionProgressView(
+                            viewModel: viewModel,
+                            stage: viewModel.state.activeDetailStage,
+                            detail: detail,
+                            downloads: stageDownloads
+                        )
+                    }
+
                     if viewModel.state.activeDetailStage == .development {
                         DashboardCard(title: "当前阶段工作区") {
                             detailStageWorkspace(project: project, detail: viewModel.state.selectedExecutionDetail)

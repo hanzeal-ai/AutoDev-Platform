@@ -38,10 +38,11 @@ extension DaemonClient {
         ["project_id": projectID]
     }
 
-    static func advanceProjectStagePayload(projectID: String, action: String) -> [String: Any] {
+    static func advanceProjectStagePayload(projectID: String, action: String, autoTriggerAI: Bool) -> [String: Any] {
         [
             "project_id": projectID,
             "action": action,
+            "auto_trigger_ai": autoTriggerAI,
         ]
     }
 

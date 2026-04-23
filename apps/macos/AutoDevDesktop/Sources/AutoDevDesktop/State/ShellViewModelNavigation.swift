@@ -145,11 +145,20 @@ extension ShellViewModel {
             advanceSelectedProjectLocally(projectID: projectID)
             state.triggerStageAction(action)
         case .liveDaemon:
+            let currentStage = state.activeDetailStage
+            let nextStage = nextStage(after: currentStage)
+            let autoTriggerAI: Bool
+            if let next = nextStage {
+                autoTriggerAI = state.stageAutomation.shouldAutoTriggerAI(for: next)
+            } else {
+                autoTriggerAI = false
+            }
             Task { @MainActor in
                 do {
                     _ = try await daemonClient.advanceProjectStage(
                         projectID: projectID.uuidString,
-                        action: action
+                        action: action,
+                        autoTriggerAI: autoTriggerAI
                     )
                     try await refreshOverviewAndProjects()
                     if let stage = state.selectedProject?.lifecycleStage {
@@ -157,10 +166,59 @@ extension ShellViewModel {
                     }
                     await refreshSelectedProjectDetail()
                     state.statusMessage = "阶段已推进：\(action)"
+
+                    if autoTriggerAI, let next = nextStage {
+                        startAutoAdvancePolling(projectID: projectID, stage: next)
+                    }
                 } catch {
                     state.apply(operationError: error, context: action)
                 }
             }
+        }
+    }
+
+    private func startAutoAdvancePolling(projectID: UUID, stage: DeliveryLifecycleStage) {
+        guard autoAdvanceDepth < Self.maxAutoAdvanceDepth else {
+            state.statusMessage = "已达到自动推进上限（\(Self.maxAutoAdvanceDepth) 个阶段），请手动确认后继续"
+            autoAdvanceDepth = 0
+            return
+        }
+        autoAdvanceTask?.cancel()
+        autoAdvanceTask = Task { @MainActor [weak self] in
+            let maxPolls = 120
+            var pollDelay: UInt64 = 2_000_000_000
+            let maxDelay: UInt64 = 5_000_000_000
+            for _ in 0..<maxPolls {
+                guard !Task.isCancelled else { return }
+                try? await Task.sleep(nanoseconds: pollDelay)
+                guard !Task.isCancelled else { return }
+                guard let self,
+                      self.state.selectedProject?.id == projectID,
+                      self.state.activeDetailStage == stage
+                else { return }
+
+                await self.refreshSelectedProjectDetail()
+
+                let key = ProjectExecutionDetailKey(projectID: projectID, stage: stage)
+                if let detail = self.state.executionDetails[key],
+                   let aiRun = detail.aiRun, !aiRun.isActive
+                {
+                    if aiRun.status == "completed",
+                       !self.state.stageAutomation.stageNeedsConfirmation(stage),
+                       self.nextStage(after: stage) != nil
+                    {
+                        self.autoAdvanceDepth += 1
+                        self.advanceSelectedProjectStage(
+                            action: ShellViewState.defaultPrimaryAction(for: stage)
+                        )
+                    } else {
+                        self.autoAdvanceDepth = 0
+                    }
+                    return
+                }
+                pollDelay = min(pollDelay + 500_000_000, maxDelay)
+            }
+            self?.autoAdvanceDepth = 0
         }
     }
 

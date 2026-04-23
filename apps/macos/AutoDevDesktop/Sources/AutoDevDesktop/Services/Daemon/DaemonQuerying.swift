@@ -14,7 +14,7 @@ protocol DaemonQuerying {
     func addCreationMessage(threadID: String, content: String) async throws -> DaemonCommandResult
     func addCreationMaterials(threadID: String, paths: [String]) async throws
     func confirmFeasibility(threadID: String) async throws -> DaemonCommandResult
-    func advanceProjectStage(projectID: String, action: String) async throws -> DaemonCommandResult
+    func advanceProjectStage(projectID: String, action: String, autoTriggerAI: Bool) async throws -> DaemonCommandResult
     func planDevelopment(projectID: String) async throws -> DaemonCommandResult
     func generateProjectStageAI(projectID: String, stage: String?) async throws -> DaemonCommandResult
 }

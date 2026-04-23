@@ -1,9 +1,11 @@
-use super::super::super::super::helpers::to_json_string;
+use super::super::super::super::helpers::{ensure_parent_dir, to_json_string};
 use super::super::super::super::{StageDefaults, Store, StoreResult};
 use super::prompt::stage_prompt_label;
 use crate::runtime::DeepSeekConfig;
 use rusqlite::params;
 use serde_json::{json, Value};
+use std::fs;
+use uuid::Uuid;
 
 const MAX_INPUT_CONTEXTS: usize = 8;
 const MAX_RISK_ITEMS: usize = 6;
@@ -49,6 +51,70 @@ pub(super) fn persist_stage_content(
     content: &Value,
 ) -> StoreResult<()> {
     let now = super::super::super::super::helpers::now_ms();
+    let label = stage_prompt_label(stage);
+
+    // Sanitize path components to prevent path traversal
+    let safe_project_id = sanitize_path_component(project_id);
+    let safe_stage = sanitize_path_component(stage);
+
+    let artifact_dir = store
+        .paths
+        .blobs_dir()
+        .join("stage_artifacts")
+        .join(&safe_project_id)
+        .join(&safe_stage);
+    let file_name = format!("{}-snapshot.md", stage);
+    let file_path = artifact_dir.join(&file_name);
+    ensure_parent_dir(&file_path)?;
+
+    let markdown = render_stage_markdown(label, content);
+    fs::write(&file_path, &markdown)
+        .map_err(|err| format!("failed to write stage artifact {}: {}", file_path.display(), err))?;
+
+    let file_path_str = file_path.display().to_string();
+    let artifact_id = Uuid::new_v4().to_string();
+    let artifact_name = format!("{} 文档", label);
+    let artifact_kind = format!("{}-snapshot", stage);
+
+    store
+        .conn
+        .execute(
+            "DELETE FROM stage_artifacts WHERE project_id = ?1 AND stage = ?2 AND kind = ?3",
+            params![project_id, stage, &artifact_kind],
+        )
+        .map_err(|err| err.to_string())?;
+
+    store
+        .conn
+        .execute(
+            r#"
+INSERT INTO stage_artifacts (
+  id, project_id, stage, name, kind, updated_at_ms, file_path, content_type
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+"#,
+            params![
+                &artifact_id,
+                project_id,
+                stage,
+                &artifact_name,
+                &artifact_kind,
+                now,
+                &file_path_str,
+                "text/markdown"
+            ],
+        )
+        .map_err(|err| err.to_string())?;
+
+    let downloads_json = to_json_string(&json!([{
+        "id": &artifact_id,
+        "title": &artifact_name,
+        "category": "stage_snapshot",
+        "availability": "ready",
+        "file_path": &file_path_str,
+        "updated_at_ms": now,
+        "content_type": "text/markdown"
+    }]));
+
     store
         .conn
         .execute(
@@ -66,6 +132,7 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
   event_flow_json = excluded.event_flow_json,
   primary_action = excluded.primary_action,
   secondary_actions_json = excluded.secondary_actions_json,
+  downloads_json = excluded.downloads_json,
   work_units_json = excluded.work_units_json,
   updated_at_ms = excluded.updated_at_ms
 "#,
@@ -105,13 +172,78 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
                         .get("secondary_actions")
                         .unwrap_or(&json!(defaults.secondary_actions))
                 ),
-                "[]",
+                &downloads_json,
                 to_json_string(content.get("work_units").unwrap_or(&json!([]))),
                 now,
             ],
         )
         .map_err(|err| err.to_string())?;
     Ok(())
+}
+
+fn render_stage_markdown(label: &str, content: &Value) -> String {
+    let mut md = String::new();
+    md.push_str(&format!("# {} 阶段文档\n\n", label));
+
+    if let Some(objective) = content.get("objective").and_then(Value::as_str) {
+        if !objective.is_empty() {
+            md.push_str(&format!("## 目标\n\n{}\n\n", objective));
+        }
+    }
+
+    if let Some(items) = content.get("input_contexts").and_then(Value::as_array) {
+        let items: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
+        if !items.is_empty() {
+            md.push_str("## 输入上下文\n\n");
+            for item in items {
+                md.push_str(&format!("- {}\n", item));
+            }
+            md.push('\n');
+        }
+    }
+
+    if let Some(steps) = content.get("step_progress").and_then(Value::as_array) {
+        if !steps.is_empty() {
+            md.push_str("## 执行步骤\n\n");
+            for step in steps {
+                let title = step.get("title").and_then(Value::as_str).unwrap_or("-");
+                let status = step.get("status").and_then(Value::as_str).unwrap_or("queued");
+                md.push_str(&format!("- [{}] {}\n", status, title));
+            }
+            md.push('\n');
+        }
+    }
+
+    if let Some(items) = content.get("risk_items").and_then(Value::as_array) {
+        let items: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
+        if !items.is_empty() {
+            md.push_str("## 风险项\n\n");
+            for item in items {
+                md.push_str(&format!("- {}\n", item));
+            }
+            md.push('\n');
+        }
+    }
+
+    if let Some(units) = content.get("work_units").and_then(Value::as_array) {
+        if !units.is_empty() {
+            md.push_str("## 工作单元\n\n");
+            for unit in units {
+                let title = unit.get("title").and_then(Value::as_str).unwrap_or("-");
+                let role = unit.get("agent_role").and_then(Value::as_str).unwrap_or("-");
+                let status = unit.get("status").and_then(Value::as_str).unwrap_or("queued");
+                md.push_str(&format!("### {}\n\n", title));
+                md.push_str(&format!("- Agent: {}\n", role));
+                md.push_str(&format!("- 状态: {}\n", status));
+                if let Some(next) = unit.get("next_step").and_then(Value::as_str) {
+                    md.push_str(&format!("- 下一步: {}\n", next));
+                }
+                md.push('\n');
+            }
+        }
+    }
+
+    md
 }
 
 fn text_field(candidate: &Value, key: &str, fallback: &str) -> String {
@@ -231,4 +363,13 @@ fn normalize_status(candidate: Option<&str>, fallback: &str) -> String {
         }
         _ => fallback.to_string(),
     }
+}
+
+/// Strip path-traversal characters from a path component (project_id, stage).
+fn sanitize_path_component(input: &str) -> String {
+    input
+        .replace("..", "")
+        .replace('/', "")
+        .replace('\\', "")
+        .replace('\0', "")
 }

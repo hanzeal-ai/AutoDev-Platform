@@ -1,32 +1,41 @@
 import SwiftUI
 
 struct StageArtifactListView: View {
+    @ObservedObject var viewModel: ShellViewModel
     let items: [DeliveryArtifactItem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
             ForEach(items) { item in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "doc.text")
+                        .foregroundColor(.green)
+                        .font(.subheadline)
+                    if let filePath = item.filePath, !filePath.isEmpty {
+                        Text(fileNameFromPath(filePath))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.green)
+                            .underline()
+                            .onTapGesture {
+                                viewModel.openFilePath(filePath)
+                            }
+                            .handCursorOnHover()
+                            .help(filePath)
+                    } else {
                         Text(item.name)
                             .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(item.kind)
-                            .font(.caption.weight(.semibold))
                             .foregroundColor(.secondary)
                     }
-
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(item.updatedAt)
+                    if !item.kind.isEmpty {
+                        Text(item.kind)
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        if let filePath = item.filePath, !filePath.isEmpty {
-                            Text(filePath)
-                                .font(.caption.monospaced())
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                    }
+                    Spacer()
+                    if item.filePath == nil || item.filePath?.isEmpty == true {
+                        Text("待生成")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 .padding(8)

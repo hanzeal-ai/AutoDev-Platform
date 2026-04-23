@@ -1,5 +1,6 @@
 mod http;
 mod parse;
+pub(crate) mod worker;
 
 use super::super::{Store, StoreResult};
 use rusqlite::params;

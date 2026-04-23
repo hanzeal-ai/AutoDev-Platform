@@ -2,7 +2,7 @@ mod helpers;
 mod materials;
 mod overview;
 mod projects;
-mod reports;
+pub(crate) mod reports;
 mod schema;
 mod threads;
 

@@ -4,6 +4,18 @@ struct ProjectDetailDecisionSection: View {
     @ObservedObject var viewModel: ShellViewModel
     let detail: DeliveryExecutionDetail
 
+    private var showActionButtons: Bool {
+        guard detail.status != .completed else { return false }
+        let stage = viewModel.state.activeDetailStage
+        let config = viewModel.state.stageAutomation
+        if !config.stageNeedsConfirmation(stage) {
+            if let aiRun = detail.aiRun, aiRun.isActive {
+                return false
+            }
+        }
+        return true
+    }
+
     var body: some View {
         DashboardCard(title: "决策条") {
             VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
@@ -12,12 +24,16 @@ struct ProjectDetailDecisionSection: View {
                     MetricPill(title: "状态", value: detail.status.rawValue, valueColor: detail.status.color)
                     MetricPill(title: "更新时间", value: detail.updatedAt)
                     Spacer()
-                    if detail.status != .completed {
+                    if showActionButtons {
                         ProjectDetailActionCluster(
                             viewModel: viewModel,
                             primaryAction: viewModel.state.selectedStagePrimaryAction,
                             secondaryActions: viewModel.state.selectedStageSecondaryActions
                         )
+                    } else if detail.status != .completed {
+                        Text("自动推进中…")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 Text(viewModel.state.selectedDetailDecisionQuestion)

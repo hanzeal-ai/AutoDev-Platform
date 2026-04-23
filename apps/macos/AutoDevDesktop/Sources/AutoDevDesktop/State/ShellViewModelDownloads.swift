@@ -34,4 +34,8 @@ extension ShellViewModel {
         }
         openLocalPath(path)
     }
+
+    func openFilePath(_ path: String) {
+        openLocalPath(path)
+    }
 }

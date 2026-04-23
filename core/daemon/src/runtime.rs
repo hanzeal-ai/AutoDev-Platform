@@ -62,6 +62,7 @@ impl RuntimePaths {
 
 pub fn health_payload(paths: &RuntimePaths) -> Value {
     let deepseek = DeepSeekConfig::from_env().ok();
+    let ai_worker_available = crate::store::reports::llm::worker::worker_available();
     json!({
         "status": "ok",
         "daemon_version": env!("CARGO_PKG_VERSION"),
@@ -72,6 +73,7 @@ pub fn health_payload(paths: &RuntimePaths) -> Value {
         "deepseek_configured": deepseek.is_some(),
         "deepseek_model": deepseek.as_ref().map(|config| config.model()),
         "deepseek_base_url": deepseek.as_ref().map(|config| config.endpoint()),
+        "ai_worker_available": ai_worker_available,
     })
 }
 

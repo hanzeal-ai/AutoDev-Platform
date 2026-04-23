@@ -3,8 +3,8 @@ import SwiftUI
 extension ProjectDetailPage {
     func releaseWorkspace(detail: DeliveryExecutionDetail?) -> some View {
         let lines = detail?.inputContexts ?? []
+        let releaseDownloads = stageDownloads(in: [.stageSnapshot, .auditArchive])
         let artifacts = detail?.outputArtifacts ?? []
-        let releaseDownloads = stageDownloads(in: [.auditArchive])
         let versionInfo = AutoDevTextSupport.value(for: "版本信息", in: lines)
         let releaseItems = AutoDevTextSupport.compactItems([
             AutoDevTextSupport.value(for: "发布准备", in: lines),
@@ -15,20 +15,25 @@ extension ProjectDetailPage {
         let rollback = AutoDevTextSupport.value(for: "回滚条件", in: lines)
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
-            StageAIExecutionProgressView(
-                viewModel: viewModel,
-                stage: .release,
-                detail: detail,
-                downloads: releaseDownloads
-            )
+            stageModule("进度轨迹", when: !(detail?.stepProgress.isEmpty ?? true)) {
+                StageStepProgressBar(steps: detail?.stepProgress ?? [])
+            }
 
             stageModule(
-                "发布准备",
-                when: versionInfo != nil || !releaseItems.isEmpty
+                "发布概览",
+                when: versionInfo != nil || releaseStatus != nil || releaseWindow != nil || !releaseItems.isEmpty
             ) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let versionInfo {
-                        KeyValueRow(key: "版本信息", value: versionInfo)
+                    HStack(spacing: 12) {
+                        if let versionInfo {
+                            MetricPill(title: "版本", value: versionInfo)
+                        }
+                        if let releaseStatus {
+                            MetricPill(title: "发布状态", value: releaseStatus)
+                        }
+                        if let releaseWindow {
+                            MetricPill(title: "上线窗口", value: releaseWindow)
+                        }
                     }
                     if !releaseItems.isEmpty {
                         StageBulletsView(items: releaseItems)
@@ -36,30 +41,18 @@ extension ProjectDetailPage {
                 }
             }
 
-            stageModule(
-                "发布状态",
-                when: releaseStatus != nil || releaseWindow != nil || !artifacts.isEmpty
-            ) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let releaseStatus {
-                        KeyValueRow(key: "当前发布状态", value: releaseStatus)
-                    }
-                    if let releaseWindow {
-                        KeyValueRow(key: "上线窗口", value: releaseWindow)
-                    }
-                    let envTargets = AutoDevTextSupport.filteredArtifacts(artifacts, contains: "环境目标")
-                    if !envTargets.isEmpty {
-                        StageBulletsView(items: envTargets)
-                    }
+            stageModule("回滚预案", when: rollback != nil) {
+                if let rollbackText = rollback {
+                    Text(rollbackText)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
-            stageModule("回滚条件", when: rollback != nil || !releaseDownloads.isEmpty) {
+            stageModule("阶段产物", when: !artifacts.isEmpty || !releaseDownloads.isEmpty) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let rollback {
-                        Text(rollback)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    if !artifacts.isEmpty {
+                        StageArtifactListView(viewModel: viewModel, items: artifacts)
                     }
                     if !releaseDownloads.isEmpty {
                         StageDownloadListView(viewModel: viewModel, items: releaseDownloads)

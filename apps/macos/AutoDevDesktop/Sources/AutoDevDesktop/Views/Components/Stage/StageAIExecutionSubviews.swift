@@ -181,25 +181,26 @@ struct AIArtifactBlock: View {
             }
 
             ForEach(items) { item in
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Image(systemName: "doc.text")
                         .foregroundColor(.green)
-                    VStack(alignment: .leading, spacing: 3) {
+                        .font(.subheadline)
+                    if let path = item.filePath, !path.isEmpty {
+                        Text(fileNameFromPath(path))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.green)
+                            .underline()
+                            .onTapGesture {
+                                viewModel.openStageDownload(item)
+                            }
+                            .handCursorOnHover()
+                            .help(path)
+                    } else {
                         Text(item.title)
                             .font(.subheadline.weight(.medium))
-                        if let path = item.filePath {
-                            Text(path)
-                                .font(.caption.monospaced())
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
+                            .foregroundColor(.secondary)
                     }
                     Spacer()
-                    Button("查看") {
-                        viewModel.openStageDownload(item)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
                 .padding(.vertical, 4)
             }

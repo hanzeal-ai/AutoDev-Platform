@@ -50,6 +50,9 @@ extension ShellViewState {
             creationInputInsertionRequest: nil,
             isSettingsPresented: false,
             appearanceMode: .system,
+            storageLocationMode: StorageLocationMode.load(),
+            localStoragePath: StorageLocationMode.loadLocalPath(fallback: defaultLocalStoragePath()),
+            stageAutomation: StageAutomationConfig.load(),
             projects: [],
             managedAlerts: [],
             progressNotices: [],
@@ -68,4 +71,11 @@ extension ShellViewState {
             statusMessage: statusMessage
         )
     }
+}
+
+private func defaultLocalStoragePath() -> String {
+    let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+    return appSupport?
+        .appendingPathComponent("com.sanmws.autodev/blobs")
+        .path ?? "~/Library/Application Support/com.sanmws.autodev/blobs"
 }

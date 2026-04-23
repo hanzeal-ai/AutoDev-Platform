@@ -9,33 +9,32 @@ struct StageDownloadListView: View {
             VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
                 ForEach(items) { item in
                     HStack(alignment: .center, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
+                        Image(systemName: "doc.text")
+                            .foregroundColor(item.availability == .pending ? .secondary : .green)
+                            .font(.subheadline)
+                        if let filePath = item.filePath, !filePath.isEmpty, item.availability != .pending {
+                            Text(fileNameFromPath(filePath))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.green)
+                                .underline()
+                                .onTapGesture {
+                                    viewModel.openStageDownload(item)
+                                }
+                                .handCursorOnHover()
+                                .help(filePath)
+                        } else {
                             Text(item.title)
                                 .font(.subheadline.weight(.medium))
-                            Text(item.category.rawValue)
+                                .foregroundColor(.secondary)
+                        }
+                        Text(item.category.rawValue)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        if item.availability == .pending {
+                            Text("待生成")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            if let filePath = item.filePath, !filePath.isEmpty {
-                                Text(filePath)
-                                    .font(.caption2.monospaced())
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        Spacer()
-                        switch item.availability {
-                        case .ready:
-                            Button("下载") {
-                                viewModel.openStageDownload(item)
-                            }
-                            .buttonStyle(.bordered)
-                        case .viewOnly:
-                            Button("查看") {
-                                viewModel.openStageDownload(item)
-                            }
-                            .buttonStyle(.bordered)
-                        case .pending:
-                            EmptyView()
                         }
                     }
                     .padding(8)

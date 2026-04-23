@@ -23,15 +23,11 @@ extension ProjectDetailPage {
         ])
         let blueprintOutputs = blueprint?.outputArtifacts ?? []
         let blueprintRisks = blueprint?.riskItems ?? []
-        let downloads = stageDownloads(in: [.stageSnapshot, .auditArchive])
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
-            StageAIExecutionProgressView(
-                viewModel: viewModel,
-                stage: .development,
-                detail: detail,
-                downloads: downloads
-            )
+            stageModule("进度轨迹", when: !(detail?.stepProgress.isEmpty ?? true)) {
+                StageStepProgressBar(steps: detail?.stepProgress ?? [])
+            }
 
             VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
                 stageModule("当前执行", when: activeUnit != nil) {
@@ -58,7 +54,7 @@ extension ProjectDetailPage {
                             StageLabeledListView(title: "蓝图预期产物", items: blueprintOutputs)
                         }
                         if !outputs.isEmpty {
-                            StageArtifactListView(items: outputs)
+                            StageArtifactListView(viewModel: viewModel, items: outputs)
                         }
                         if let blockerReason = detail?.blockerReason {
                             KeyValueRow(key: "阻塞原因", value: blockerReason)

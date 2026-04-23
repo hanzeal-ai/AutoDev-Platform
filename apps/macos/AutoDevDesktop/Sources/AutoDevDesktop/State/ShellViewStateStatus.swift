@@ -61,6 +61,35 @@ extension ShellViewState {
         appearanceMode = mode
     }
 
+    mutating func setStorageLocationMode(_ mode: StorageLocationMode) {
+        storageLocationMode = mode
+        mode.save()
+    }
+
+    mutating func setLocalStoragePath(_ path: String) {
+        localStoragePath = path
+        StorageLocationMode.saveLocalPath(path)
+    }
+
+    mutating func setStageAutomationMode(_ mode: StageAutomationMode) {
+        stageAutomation.mode = mode
+        stageAutomation.save()
+    }
+
+    mutating func toggleManualConfirmStage(_ stage: DeliveryLifecycleStage) {
+        if stageAutomation.manualConfirmStages.contains(stage) {
+            stageAutomation.manualConfirmStages.remove(stage)
+        } else {
+            stageAutomation.manualConfirmStages.insert(stage)
+        }
+        stageAutomation.save()
+    }
+
+    mutating func setManualSubSteps(_ enabled: Bool) {
+        stageAutomation.manualSubSteps = enabled
+        stageAutomation.save()
+    }
+
     mutating func triggerStageAction(_ action: String) {
         statusMessage = "阶段动作已触发：\(action)"
     }

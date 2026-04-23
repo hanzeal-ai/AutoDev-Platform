@@ -3,8 +3,8 @@ import SwiftUI
 extension ProjectDetailPage {
     func testingWorkspace(detail: DeliveryExecutionDetail?) -> some View {
         let lines = detail?.inputContexts ?? []
-        let artifacts = detail?.outputArtifacts ?? []
         let testingDownloads = stageDownloads(in: [.stageSnapshot, .auditArchive])
+        let artifacts = detail?.outputArtifacts ?? []
         let testScope = AutoDevTextSupport.value(for: "测试范围", in: lines)
         let passRate = AutoDevTextSupport.value(for: "通过率", in: lines)
         let regression = AutoDevTextSupport.value(for: "回归状态", in: lines)
@@ -14,47 +14,43 @@ extension ProjectDetailPage {
         ])
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
-            StageAIExecutionProgressView(
-                viewModel: viewModel,
-                stage: .testing,
-                detail: detail,
-                downloads: testingDownloads
-            )
+            stageModule("进度轨迹", when: !(detail?.stepProgress.isEmpty ?? true)) {
+                StageStepProgressBar(steps: detail?.stepProgress ?? [])
+            }
 
             stageModule(
-                "测试结论",
-                when: testScope != nil || passRate != nil || !artifacts.isEmpty
+                "测试概览",
+                when: testScope != nil || passRate != nil || regression != nil
             ) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
+                HStack(spacing: 12) {
                     if let testScope {
-                        KeyValueRow(key: "测试范围", value: testScope)
+                        MetricPill(title: "测试范围", value: testScope)
                     }
                     if let passRate {
-                        KeyValueRow(key: "通过率", value: passRate)
+                        MetricPill(title: "通过率", value: passRate, valueColor: .green)
                     }
-                    let acceptance = AutoDevTextSupport.filteredArtifacts(artifacts, contains: "验收结论")
-                    if !acceptance.isEmpty {
-                        StageBulletsView(items: acceptance)
+                    if let regression {
+                        MetricPill(title: "回归状态", value: regression)
                     }
                 }
             }
 
             stageModule(
-                "失败与阻塞",
+                "问题清单",
                 when: !blockers.isEmpty || detail?.blockerReason != nil
             ) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
                     StageBulletsView(items: blockers)
                     if let blockerReason = detail?.blockerReason {
-                        KeyValueRow(key: "阻塞", value: blockerReason)
+                        KeyValueRow(key: "阻塞原因", value: blockerReason)
                     }
                 }
             }
 
-            stageModule("回归状态", when: regression != nil || !testingDownloads.isEmpty) {
+            stageModule("阶段产物", when: !artifacts.isEmpty || !testingDownloads.isEmpty) {
                 VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let regression {
-                        KeyValueRow(key: "回归状态", value: regression)
+                    if !artifacts.isEmpty {
+                        StageArtifactListView(viewModel: viewModel, items: artifacts)
                     }
                     if !testingDownloads.isEmpty {
                         StageDownloadListView(viewModel: viewModel, items: testingDownloads)

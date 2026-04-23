@@ -24,6 +24,11 @@ extension ShellViewState {
     }
 
     var selectedDetailDecisionQuestion: String {
+        if !stageAutomation.stageNeedsConfirmation(activeDetailStage) {
+            if let detail = selectedExecutionDetail, let aiRun = detail.aiRun, aiRun.isActive {
+                return "后台 AI 正在自动处理，完成后将自动推进到下一阶段"
+            }
+        }
         switch activeDetailStage {
         case .feasibility:
             return "是否确认立项并进入 PRD"

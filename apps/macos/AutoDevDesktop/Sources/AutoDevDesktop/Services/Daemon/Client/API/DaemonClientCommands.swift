@@ -75,10 +75,10 @@ extension DaemonClient {
         }
     }
 
-    func advanceProjectStage(projectID: String, action: String) async throws -> DaemonCommandResult {
+    func advanceProjectStage(projectID: String, action: String, autoTriggerAI: Bool) async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.advanceProjectStageCommand,
-            payload: Self.advanceProjectStagePayload(projectID: projectID, action: action),
+            payload: Self.advanceProjectStagePayload(projectID: projectID, action: action, autoTriggerAI: autoTriggerAI),
             expectedResponse: IPCContract.MessageType.advanceProjectStageSuccess,
             timeoutSeconds: 60
         ) { payload in

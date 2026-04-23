@@ -237,7 +237,11 @@
             "OBJ_317",
             "OBJ_319",
             "OBJ_321",
-            "OBJ_323"
+            "OBJ_323",
+            "OBJ_325",
+            "OBJ_327",
+            "OBJ_329",
+            "OBJ_331"
          );
       };
       "OBJ_106" = {
@@ -360,7 +364,9 @@
       "OBJ_13" = {
          isa = "PBXGroup";
          children = (
-            "OBJ_14"
+            "OBJ_14",
+            "OBJ_326",
+            "OBJ_328"
          );
          name = "App";
          path = "App";
@@ -1226,6 +1232,42 @@
          isa = "PBXBuildFile";
          fileRef = "OBJ_322";
       };
+      "OBJ_324" = {
+         isa = "PBXFileReference";
+         path = "StageStepProgressBar.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_325" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_324";
+      };
+      "OBJ_326" = {
+         isa = "PBXFileReference";
+         path = "StorageLocationMode.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_327" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_326";
+      };
+      "OBJ_328" = {
+         isa = "PBXFileReference";
+         path = "StageAutomationConfig.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_329" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_328";
+      };
+      "OBJ_330" = {
+         isa = "PBXFileReference";
+         path = "StageViewHelpers.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_331" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_330";
+      };
       "OBJ_18" = {
          isa = "PBXFileReference";
          path = "DaemonCommandDTO.swift";
@@ -1664,7 +1706,9 @@
             "OBJ_68",
             "OBJ_69",
             "OBJ_320",
-            "OBJ_322"
+            "OBJ_322",
+            "OBJ_324",
+            "OBJ_330"
          );
          name = "Stage";
          path = "Stage";

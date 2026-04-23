@@ -19,6 +19,7 @@ struct StageAIExecutionProgressView: View {
             !event.title.hasPrefix("系统：创建阶段 Agent")
                 && !event.title.hasPrefix("系统：发送任务指令")
                 && !event.title.contains("正在等待 Agent 回复")
+                && !event.title.hasPrefix("Agent：阶段回复")
         }
     }
 
@@ -27,6 +28,7 @@ struct StageAIExecutionProgressView: View {
             event.title.hasPrefix("系统：创建阶段 Agent")
                 || event.title.hasPrefix("系统：发送任务指令")
                 || event.title.contains("正在等待 Agent 回复")
+                || event.title.hasPrefix("Agent：阶段回复")
         }
     }
 
@@ -69,21 +71,83 @@ struct StageAIExecutionProgressView: View {
     }
 
     private var visibleMessages: [AITranscriptMessage] {
-        visibleEvents.map { event in
-            AITranscriptMessage(kind: kind(for: event), title: event.title, body: event.detail, footnote: event.time)
+        visibleEvents.compactMap { event in
+            if event.title.hasPrefix("Agent："),
+               event.detail.count > 200
+            {
+                return nil
+            }
+            return AITranscriptMessage(kind: kind(for: event), title: event.title, body: event.detail, footnote: event.time)
+        }
+    }
+
+    private var writingStatusMessage: AITranscriptMessage? {
+        let stageName = stage.rawValue
+        switch executionState {
+        case .waitingFirstDelta:
+            return AITranscriptMessage(
+                kind: .loading,
+                title: "准备写入",
+                body: "正在等待 AI 开始生成 \(stageName) 文档…",
+                footnote: latestActivity?.time ?? ""
+            )
+        case .outputting:
+            let deltaCount = detail?.aiRun?.deltaCount ?? 0
+            return AITranscriptMessage(
+                kind: .output,
+                title: "正在写入 \(stageName) 文档",
+                body: "已接收 \(deltaCount) 个内容片段，写入中…",
+                footnote: latestActivity?.time ?? ""
+            )
+        case .postProcessing:
+            return AITranscriptMessage(
+                kind: .output,
+                title: "正在整理 \(stageName) 文档",
+                body: "AI 输出完成，正在写入文件…",
+                footnote: latestActivity?.time ?? ""
+            )
+        case .completed:
+            return AITranscriptMessage(
+                kind: .file,
+                title: "\(stageName) 文档已生成",
+                body: artifactItems.isEmpty ? "文档已写入，可在阶段产物中查看。" : "\(artifactItems.count) 个文件已输出。",
+                footnote: latestActivity?.time ?? ""
+            )
+        case .failed:
+            let errorMsg = detail?.aiRun?.errorMessage ?? "未知原因"
+            return AITranscriptMessage(
+                kind: .system,
+                title: "生成失败",
+                body: errorMsg,
+                footnote: latestActivity?.time ?? ""
+            )
+        case .waiting:
+            return nil
         }
     }
 
     private var artifactItems: [StageDownloadItem] {
-        downloads.filter { item in
+        var items = downloads.filter { item in
             item.filePath?.isEmpty == false && item.availability != .pending
         }
+        let outputFiles = (detail?.outputArtifacts ?? []).compactMap { artifact -> StageDownloadItem? in
+            guard let path = artifact.filePath, !path.isEmpty else { return nil }
+            guard !items.contains(where: { $0.filePath == path }) else { return nil }
+            return StageDownloadItem(
+                id: artifact.id,
+                title: artifact.name,
+                category: .stageSnapshot,
+                availability: .ready,
+                filePath: path
+            )
+        }
+        items.append(contentsOf: outputFiles)
+        return items
     }
 
     private var scrollAnchorID: String {
-        let messagePart = visibleMessages.map { "\($0.title):\($0.body.count)" }.joined(separator: "|")
         let artifactPart = artifactItems.map { "\($0.title):\($0.filePath ?? "")" }.joined(separator: "|")
-        return "\(executionState.label)|\(thinkingEvents.count)|\(messagePart)|\(artifactPart)"
+        return "\(executionState.label)|\(thinkingEvents.count)|\(detail?.aiRun?.deltaCount ?? 0)|\(artifactPart)"
     }
 
     var body: some View {
@@ -125,7 +189,7 @@ struct StageAIExecutionProgressView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
-                            if thinkingEvents.isEmpty && visibleMessages.isEmpty && artifactItems.isEmpty {
+                            if thinkingEvents.isEmpty && writingStatusMessage == nil && artifactItems.isEmpty {
                                 AITranscriptBubble(
                                     message: AITranscriptMessage(
                                         kind: .system,
@@ -145,6 +209,10 @@ struct StageAIExecutionProgressView: View {
 
                                 ForEach(visibleMessages) { message in
                                     AITranscriptBubble(message: message)
+                                }
+
+                                if let statusMessage = writingStatusMessage {
+                                    AITranscriptBubble(message: statusMessage)
                                 }
 
                                 if !artifactItems.isEmpty {
