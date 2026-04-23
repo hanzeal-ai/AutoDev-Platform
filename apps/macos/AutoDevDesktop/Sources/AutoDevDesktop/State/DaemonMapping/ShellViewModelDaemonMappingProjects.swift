@@ -2,7 +2,10 @@ import Foundation
 
 extension ShellViewModel {
     static func mapProject(_ dto: DaemonProject) -> DeliveryProjectItem? {
-        guard let id = UUID(uuidString: dto.id) else { return nil }
+        guard let id = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid project UUID: \(dto.id)")
+            return nil
+        }
         return DeliveryProjectItem(
             id: id,
             title: dto.title,

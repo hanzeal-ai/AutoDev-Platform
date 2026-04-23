@@ -62,10 +62,14 @@ impl Store {
                 logger::error_fields(
                     "stage agent task failed",
                     &[
-                        ("project_id", project_id_for_task),
-                        ("stage", active_stage_for_task),
-                        ("reason", reason),
+                        ("project_id", project_id_for_task.clone()),
+                        ("stage", active_stage_for_task.clone()),
+                        ("reason", reason.clone()),
                     ],
+                );
+                let _ = store.conn.execute(
+                    "UPDATE stage_ai_runs SET status = 'failed', error_message = ?1 WHERE id = ?2",
+                    rusqlite::params![reason, run_id],
                 );
             }
         });

@@ -18,7 +18,7 @@ VALUES (?1, ?2, 0, NULL, 'feasibility', ?3, ?4)
 "#,
                 params![thread_id, title, now, now],
             )
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| format!("failed to create thread {}: {}", thread_id, err))?;
 
         self.conn
             .execute(

@@ -20,7 +20,10 @@ extension ShellViewModel {
     }
 
     static func mapAlert(_ dto: DaemonAlert) -> ManagedAlertItem? {
-        guard let id = UUID(uuidString: dto.id) else { return nil }
+        guard let id = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid alert UUID: \(dto.id)")
+            return nil
+        }
         return ManagedAlertItem(
             id: id,
             title: dto.title,
@@ -32,7 +35,10 @@ extension ShellViewModel {
     }
 
     static func mapProgressNotice(_ dto: DaemonProgressNotice) -> ProgressNoticeItem? {
-        guard let id = UUID(uuidString: dto.id) else { return nil }
+        guard let id = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid notice UUID: \(dto.id)")
+            return nil
+        }
         return ProgressNoticeItem(
             id: id,
             title: dto.title,
@@ -42,7 +48,10 @@ extension ShellViewModel {
     }
 
     static func mapIntervention(_ dto: DaemonIntervention) -> InterventionItem? {
-        guard let id = UUID(uuidString: dto.id) else { return nil }
+        guard let id = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid intervention UUID: \(dto.id)")
+            return nil
+        }
         return InterventionItem(
             id: id,
             title: dto.title,

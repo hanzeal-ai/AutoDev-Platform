@@ -2,7 +2,10 @@ import Foundation
 
 extension ShellViewModel {
     static func mapCreationThread(_ dto: DaemonCreationThread) -> CreationThreadSession? {
-        guard let id = UUID(uuidString: dto.id) else { return nil }
+        guard let id = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid thread UUID: \(dto.id)")
+            return nil
+        }
         let linkedProjectID = dto.linkedProjectId.flatMap(UUID.init(uuidString:))
         let materials = dto.materials.compactMap { mapCreationMaterial($0) }
         let messages = dto.messages.compactMap { mapCreationMessage($0) }
@@ -31,7 +34,10 @@ extension ShellViewModel {
     }
 
     private static func mapCreationMaterial(_ dto: DaemonMaterial) -> CreationMaterialItem? {
-        guard let materialID = UUID(uuidString: dto.id) else { return nil }
+        guard let materialID = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid material UUID: \(dto.id)")
+            return nil
+        }
         return CreationMaterialItem(
             id: materialID,
             name: dto.name,
@@ -44,7 +50,10 @@ extension ShellViewModel {
     }
 
     private static func mapCreationMessage(_ dto: DaemonCreationMessage) -> CreationConversationMessage? {
-        guard let messageID = UUID(uuidString: dto.id) else { return nil }
+        guard let messageID = UUID(uuidString: dto.id) else {
+            StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid message UUID: \(dto.id)")
+            return nil
+        }
         return CreationConversationMessage(
             id: messageID,
             role: dto.role == "user" ? .user : .ai,

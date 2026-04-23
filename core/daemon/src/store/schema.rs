@@ -147,7 +147,7 @@ CREATE INDEX IF NOT EXISTS idx_stage_ai_runs_lookup
 ON stage_ai_runs(project_id, stage, updated_at_ms DESC);
 "#,
             )
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| format!("schema initialization failed: {}", err))?;
 
         self.ensure_project_stage_columns()
     }
@@ -180,7 +180,8 @@ ON stage_ai_runs(project_id, stage, updated_at_ms DESC);
             }
         }
 
-        self.conn.execute(alter_sql, []).map_err(|err| err.to_string())?;
+        self.conn.execute(alter_sql, [])
+            .map_err(|err| format!("alter table {}.{} failed: {}", table, column, err))?;
         Ok(())
     }
 }

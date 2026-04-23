@@ -236,7 +236,8 @@
             "OBJ_314",
             "OBJ_317",
             "OBJ_319",
-            "OBJ_321"
+            "OBJ_321",
+            "OBJ_323"
          );
       };
       "OBJ_106" = {
@@ -1216,6 +1217,15 @@
          isa = "PBXBuildFile";
          fileRef = "OBJ_320";
       };
+      "OBJ_322" = {
+         isa = "PBXFileReference";
+         path = "StageAIExecutionSubviews.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_323" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_322";
+      };
       "OBJ_18" = {
          isa = "PBXFileReference";
          path = "DaemonCommandDTO.swift";
@@ -1653,7 +1663,8 @@
          children = (
             "OBJ_68",
             "OBJ_69",
-            "OBJ_320"
+            "OBJ_320",
+            "OBJ_322"
          );
          name = "Stage";
          path = "Stage";

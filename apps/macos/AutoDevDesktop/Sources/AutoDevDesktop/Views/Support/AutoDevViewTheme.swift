@@ -39,7 +39,7 @@ extension ShellRoute {
         return false
     }
 
-    var isProjectLibraryEntry: Bool {
+    var isProjectLibraryOrCreation: Bool {
         switch self {
         case .projectLibrary, .projectCreation:
             return true

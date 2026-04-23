@@ -1,14 +1,14 @@
 import Foundation
 
 extension DaemonClient {
-    func sendDecodedRequest<T>(
+    func sendDecodedRequest<T: Sendable>(
         messageType: String,
         payload: [String: Any],
         expectedResponse: String,
         timeoutSeconds: TimeInterval = 5,
-        decode: @escaping ([String: Any]) throws -> T
+        decode: @escaping @Sendable ([String: Any]) throws -> T
     ) async throws -> T {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { [self] continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let responsePayload = try self.sendRequestSync(

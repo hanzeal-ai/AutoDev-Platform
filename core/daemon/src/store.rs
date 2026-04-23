@@ -60,7 +60,8 @@ pub(super) type StoreResult<T> = Result<T, String>;
 
 impl Store {
     pub fn open(paths: &RuntimePaths) -> StoreResult<Self> {
-        let conn = Connection::open(paths.db_path()).map_err(|err| err.to_string())?;
+        let conn = Connection::open(paths.db_path())
+            .map_err(|err| format!("failed to open database at {}: {}", paths.db_path().display(), err))?;
         conn.execute_batch(
             r#"
 PRAGMA foreign_keys = ON;
@@ -70,7 +71,7 @@ PRAGMA busy_timeout = 5000;
 PRAGMA temp_store = MEMORY;
 "#,
         )
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| format!("failed to set database pragmas: {}", err))?;
 
         Ok(Self {
             conn,

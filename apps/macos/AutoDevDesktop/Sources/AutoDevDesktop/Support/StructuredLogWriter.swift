@@ -27,9 +27,9 @@ enum StructuredLogWriter {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             if FileManager.default.fileExists(atPath: url.path) {
                 if let handle = try? FileHandle(forWritingTo: url) {
+                    defer { try? handle.close() }
                     _ = try? handle.seekToEnd()
                     try? handle.write(contentsOf: data)
-                    try? handle.close()
                 }
             } else {
                 FileManager.default.createFile(atPath: url.path, contents: data)

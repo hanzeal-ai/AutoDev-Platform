@@ -76,8 +76,11 @@ enum DaemonUnixSocketTransport {
         let bytes = [UInt8](data)
         var offset = 0
         while offset < bytes.count {
-            let written = bytes.withUnsafeBytes { raw in
-                Darwin.write(fd, raw.baseAddress!.advanced(by: offset), bytes.count - offset)
+            let written = try bytes.withUnsafeBytes { raw -> Int in
+                guard let baseAddress = raw.baseAddress else {
+                    throw DaemonClientError.writeFailed(code: EINVAL)
+                }
+                return Darwin.write(fd, baseAddress.advanced(by: offset), bytes.count - offset)
             }
             if written < 0 {
                 if errno == EINTR {

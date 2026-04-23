@@ -13,6 +13,9 @@ impl Store {
             return Err("project_id must not be empty".to_string());
         }
 
+        self.conn.execute_batch("BEGIN TRANSACTION")
+            .map_err(|err| format!("begin transaction failed (plan_development, project={}): {}", project_id, err))?;
+
         let now = now_ms();
         let project_name = self.load_project_name(&project_id)?;
         let stage = "development";
@@ -37,7 +40,8 @@ impl Store {
         for spec in artifact_specs {
             let file_path = artifact_dir.join(spec.file_name);
             ensure_parent_dir(&file_path)?;
-            fs::write(&file_path, spec.content).map_err(|err| err.to_string())?;
+            fs::write(&file_path, spec.content)
+                .map_err(|err| format!("failed to write artifact {}: {}", file_path.display(), err))?;
 
             self.conn
                 .execute(
@@ -226,6 +230,9 @@ WHERE id = ?4
                 ],
             )
             .map_err(|err| err.to_string())?;
+
+        self.conn.execute_batch("COMMIT")
+            .map_err(|err| format!("commit failed (plan_development, project={}): {}", project_id, err))?;
 
         Ok(json!({
             "project_id": project_id,

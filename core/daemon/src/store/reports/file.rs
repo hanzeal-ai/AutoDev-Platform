@@ -27,7 +27,8 @@ pub(super) fn write_report_file(
         bullets(report.get("initial_delivery_plan")),
         text_or_default(report, "feasibility_conclusion", "待评估"),
     );
-    fs::write(&report_path, markdown).map_err(|err| err.to_string())?;
+    fs::write(&report_path, &markdown)
+        .map_err(|err| format!("failed to write report to {}: {}", report_path.display(), err))?;
     Ok(report_path)
 }
 

@@ -125,7 +125,7 @@ extension ShellViewModel {
 
     private func openStablePreview() {
         let preview = state.selectedStageDownloads.first {
-            $0.title.contains("预览") || $0.id.uuidString.contains("stable-preview")
+            $0.title.contains("预览")
         }
         guard let preview else {
             state.statusMessage = "稳定预览尚未生成"

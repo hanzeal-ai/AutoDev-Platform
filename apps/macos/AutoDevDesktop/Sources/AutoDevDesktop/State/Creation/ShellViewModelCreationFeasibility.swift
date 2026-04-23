@@ -24,9 +24,7 @@ extension ShellViewModel {
                 } catch {
                     state.apply(operationError: error, context: "确认可行性")
                 }
-                await MainActor.run {
-                    isConfirmingFeasibility = false
-                }
+                isConfirmingFeasibility = false
             }
         }
     }
@@ -54,9 +52,7 @@ extension ShellViewModel {
                 } catch {
                     state.apply(operationError: error, context: "确认可行性")
                 }
-                await MainActor.run {
-                    isConfirmingFeasibility = false
-                }
+                isConfirmingFeasibility = false
             }
         }
     }

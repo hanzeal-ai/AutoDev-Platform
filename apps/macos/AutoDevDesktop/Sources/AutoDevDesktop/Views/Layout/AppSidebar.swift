@@ -27,7 +27,7 @@ struct AppSidebar: View {
                 )
                 SidebarButton(
                     title: "项目库",
-                    isSelected: viewModel.state.route.isProjectLibraryEntry,
+                    isSelected: viewModel.state.route.isProjectLibraryOrCreation,
                     icon: "tray.full.fill",
                     isCollapsed: viewModel.state.isSidebarCollapsed,
                     action: { viewModel.openProjectLibrary() }

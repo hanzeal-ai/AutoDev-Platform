@@ -83,7 +83,11 @@ extension ShellViewModel {
                 )
                 guard state.selectedExecutionDetailKey == requestKey else { return }
                 state.statusMessage = "后台 AI 流式生成中..."
-                for _ in 0..<90 {
+                var pollDelay: UInt64 = 1_000_000_000  // Start at 1 second
+                let maxDelay: UInt64 = 5_000_000_000   // Cap at 5 seconds
+                let maxPolls = 60
+                for _ in 0..<maxPolls {
+                    guard !Task.isCancelled else { return }
                     await refreshSelectedProjectDetail()
                     guard state.selectedExecutionDetailKey == requestKey else { return }
                     if let detail = state.executionDetails[requestKey],
@@ -92,7 +96,8 @@ extension ShellViewModel {
                         state.statusMessage = "后台 AI 已返回阶段数据"
                         return
                     }
-                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    try await Task.sleep(nanoseconds: pollDelay)
+                    pollDelay = min(pollDelay + 500_000_000, maxDelay)
                 }
                 state.statusMessage = "后台 AI 仍在运行，可稍后刷新查看"
             } catch {
@@ -117,15 +122,11 @@ extension ShellViewModel {
     ) {
         stageAIRefreshTask?.cancel()
         guard Self.stageAIGenerationActive(detail) else { return }
-        stageAIRefreshTask = Task { [weak self] in
+        stageAIRefreshTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard self?.state.selectedExecutionDetailKey == requestKey else { return }
-                Task { @MainActor in
-                    await self?.refreshSelectedProjectDetail()
-                }
-            }
+            guard self?.state.selectedExecutionDetailKey == requestKey else { return }
+            await self?.refreshSelectedProjectDetail()
         }
     }
 

@@ -1,14 +1,11 @@
 use super::super::{Store, StoreResult};
 use super::llm::{
     list_recent_materials, list_recent_messages, request_json_object, truncate_text,
-    MaterialContext, MessageContext,
+    MaterialContext, MessageContext, MAX_CONTEXT_MATERIALS, MAX_CONTEXT_MESSAGES,
 };
 use crate::logger;
 use crate::runtime::DeepSeekConfig;
 use serde_json::{json, Value};
-
-const MAX_CONTEXT_MESSAGES: usize = 8;
-const MAX_CONTEXT_MATERIALS: usize = 6;
 
 pub(super) fn generate_final_report(store: &Store, thread_id: &str) -> StoreResult<Value> {
     let fallback_report = store.thread_report_draft(thread_id)?;

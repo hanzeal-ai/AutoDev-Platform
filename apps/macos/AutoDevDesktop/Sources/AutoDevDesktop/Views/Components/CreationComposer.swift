@@ -72,12 +72,11 @@ struct CreationComposer: View {
     }
 
     private func submit() {
-        guard threadID != nil else { return }
+        guard let threadID = threadID else { return }
         guard !isSending else { return }
         let pending = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
         draft = ""
-        guard let threadID = threadID else { return }
         onSend(threadID, pending)
     }
 }

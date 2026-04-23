@@ -1,14 +1,11 @@
 use super::super::{Store, StoreResult};
 use super::llm::{
     list_recent_materials, list_recent_messages, request_json_object, truncate_text,
-    MaterialContext, MessageContext,
+    MaterialContext, MessageContext, MAX_CONTEXT_MATERIALS, MAX_CONTEXT_MESSAGES,
 };
 use crate::logger;
 use crate::runtime::DeepSeekConfig;
 use serde_json::{json, Map, Value};
-
-const MAX_CONTEXT_MESSAGES: usize = 8;
-const MAX_CONTEXT_MATERIALS: usize = 6;
 
 pub(in crate::store) struct ClarificationTurn {
     pub(in crate::store) assistant_message: String,

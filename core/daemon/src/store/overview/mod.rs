@@ -2,19 +2,18 @@ mod counts;
 mod feeds;
 mod lifecycle;
 
+use counts::ProjectCountFilter;
 use super::{Store, StoreResult};
 use serde_json::{json, Value};
 
 impl Store {
     pub fn get_overview(&self) -> StoreResult<Value> {
-        let hosted_count = self.count_projects(None)?;
-        let running_count = self.count_projects(Some(
-            "status IN ('running','queued','awaiting_confirmation','blocked','failed')",
-        ))?;
-        let blocked_count = self.count_projects(Some("status IN ('blocked','failed')"))?;
-        let completed_count = self.count_projects(Some("status IN ('completed')"))?;
-        let queue_count = self.count_projects(Some("status IN ('queued')"))?;
-        let awaiting_count = self.count_projects(Some("status IN ('awaiting_confirmation')"))?;
+        let hosted_count = self.count_projects(ProjectCountFilter::All)?;
+        let running_count = self.count_projects(ProjectCountFilter::Active)?;
+        let blocked_count = self.count_projects(ProjectCountFilter::Blocked)?;
+        let completed_count = self.count_projects(ProjectCountFilter::Completed)?;
+        let queue_count = self.count_projects(ProjectCountFilter::Queued)?;
+        let awaiting_count = self.count_projects(ProjectCountFilter::Awaiting)?;
 
         let managed_alerts = self.managed_alerts()?;
         let interventions = self.interventions()?;
@@ -24,7 +23,7 @@ impl Store {
         let success_rate = if hosted_count == 0 {
             100
         } else {
-            ((completed_count * 100) / hosted_count).max(1)
+            ((completed_count as i128 * 100) / hosted_count as i128).max(1) as i64
         };
         let health = if blocked_count > 0 {
             "关注中"

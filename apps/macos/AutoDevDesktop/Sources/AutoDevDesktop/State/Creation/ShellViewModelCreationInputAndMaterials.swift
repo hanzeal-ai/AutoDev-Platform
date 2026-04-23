@@ -77,9 +77,7 @@ extension ShellViewModel {
                     }
                     state.apply(operationError: error, context: "发送消息")
                 }
-                await MainActor.run {
-                    isSendingCreationMessage = false
-                }
+                isSendingCreationMessage = false
             }
         }
     }
@@ -94,6 +92,13 @@ extension ShellViewModel {
         let transientLoadingMessage = localLoadingCreationMessage(threadID: threadID)
         appendTransientCreationMessage(transientLoadingMessage, threadID: threadID)
 
+        defer {
+            removeTransientCreationMessages(threadID: threadID, messageIDs: [
+                transientUserMessage.id,
+                transientLoadingMessage.id
+            ])
+        }
+
         do {
             let result = try await daemonClient.addCreationMessage(
                 threadID: threadID.uuidString,
@@ -106,15 +111,7 @@ extension ShellViewModel {
             )
             try await refreshCreationThreads()
             state.selectCreationThread(threadID)
-            removeTransientCreationMessages(threadID: threadID, messageIDs: [
-                transientUserMessage.id,
-                transientLoadingMessage.id
-            ])
         } catch {
-            removeTransientCreationMessages(threadID: threadID, messageIDs: [
-                transientUserMessage.id,
-                transientLoadingMessage.id
-            ])
             if allowRetry, isStaleCreationThreadError(error) {
                 StructuredLogWriter.write(
                     component: "autodev-app",

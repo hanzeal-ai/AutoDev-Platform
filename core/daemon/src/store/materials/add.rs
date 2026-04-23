@@ -17,6 +17,26 @@ pub(super) fn add_creation_materials(
     for item in material_inputs {
         let material_id = Uuid::new_v4().to_string();
         let source = PathBuf::from(&item.path);
+
+        // Path traversal guard
+        if item.path.contains("..") {
+            return Err(format!("material path must not contain '..': {}", item.path));
+        }
+
+        // File size limit (100 MB)
+        const MAX_MATERIAL_SIZE: u64 = 100 * 1024 * 1024;
+        if source.exists() {
+            let file_size = std::fs::metadata(&source)
+                .map_err(|err| format!("failed to read metadata for {}: {}", source.display(), err))?
+                .len();
+            if file_size > MAX_MATERIAL_SIZE {
+                return Err(format!(
+                    "material too large ({} bytes, max {} bytes): {}",
+                    file_size, MAX_MATERIAL_SIZE, item.path
+                ));
+            }
+        }
+
         let name = item
             .name
             .clone()
@@ -62,9 +82,15 @@ fn material_dest(store: &Store, material_id: &str, name: &str) -> PathBuf {
 
 fn copy_or_stub_material(source: &Path, dest: &Path) -> StoreResult<String> {
     if source.exists() {
-        fs::copy(source, dest).map_err(|err| err.to_string())?;
-        let size = fs::metadata(dest).map_err(|err| err.to_string())?.len();
-        Ok(human_file_size(size))
+        fs::copy(source, dest)
+            .map_err(|err| format!("fs::copy {} -> {}: {}", source.display(), dest.display(), err))?;
+        match fs::metadata(dest) {
+            Ok(meta) => Ok(human_file_size(meta.len())),
+            Err(err) => {
+                let _ = fs::remove_file(dest);
+                Err(err.to_string())
+            }
+        }
     } else {
         fs::write(dest, format!("原始路径不存在：{}", source.display()))
             .map_err(|err| err.to_string())?;

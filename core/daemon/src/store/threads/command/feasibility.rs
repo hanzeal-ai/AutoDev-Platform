@@ -8,6 +8,10 @@ use uuid::Uuid;
 impl Store {
     pub fn confirm_feasibility(&self, thread_id: &str) -> StoreResult<Value> {
         let now = now_ms();
+
+        self.conn.execute_batch("BEGIN TRANSACTION")
+            .map_err(|err| format!("begin transaction failed (confirm_feasibility, thread={}): {}", thread_id, err))?;
+
         let linked_project_id: Option<String> = self
             .conn
             .query_row(
@@ -134,6 +138,9 @@ WHERE id = ?2
                 ],
             );
         }
+
+        self.conn.execute_batch("COMMIT")
+            .map_err(|err| format!("commit failed (confirm_feasibility, thread={}): {}", thread_id, err))?;
 
         Ok(json!({
             "thread_id": thread_id,

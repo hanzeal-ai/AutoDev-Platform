@@ -7,7 +7,7 @@ extension ShellViewState {
         protocolVersion = "\(health.protocolVersion)"
         if health.deepseekConfigured == true {
             let trimmedModel = health.deepseekModel?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let model = (trimmedModel?.isEmpty == false) ? trimmedModel! : "deepseek-chat"
+            let model = trimmedModel.flatMap({ $0.isEmpty ? nil : $0 }) ?? "deepseek-chat"
             deepseekStatusLine = "DeepSeek 已接入 · \(model)"
         } else {
             deepseekStatusLine = "DeepSeek 未配置"

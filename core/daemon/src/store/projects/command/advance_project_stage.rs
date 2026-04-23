@@ -1,4 +1,4 @@
-use super::super::super::helpers::{now_ms, stage_defaults, to_json_string};
+use super::super::super::helpers::{now_ms, stage_defaults, stage_label, to_json_string};
 use super::super::super::{StageDefaults, Store, StoreResult};
 use crate::logger;
 use rusqlite::params;
@@ -196,18 +196,6 @@ fn next_stage(stage: &str) -> Option<&'static str> {
         "testing" => Some("release"),
         "release" => Some("maintenance"),
         _ => None,
-    }
-}
-
-fn stage_label(stage: &str) -> &'static str {
-    match stage {
-        "prd" => "PRD",
-        "ui" => "UI",
-        "development" => "研发",
-        "testing" => "测试",
-        "release" => "发布",
-        "maintenance" => "维护",
-        _ => "立项",
     }
 }
 
