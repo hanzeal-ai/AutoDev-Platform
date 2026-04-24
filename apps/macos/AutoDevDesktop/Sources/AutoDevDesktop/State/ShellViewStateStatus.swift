@@ -69,6 +69,7 @@ extension ShellViewState {
     mutating func setLocalStoragePath(_ path: String) {
         localStoragePath = path
         StorageLocationMode.saveLocalPath(path)
+        writeDaemonConfig(blobsDir: path)
     }
 
     mutating func setStageAutomationMode(_ mode: StageAutomationMode) {
@@ -97,4 +98,36 @@ extension ShellViewState {
     mutating func noteSignOutTapped() {
         statusMessage = "退出登录动作已触发，等待认证模块接入。"
     }
+
+    mutating func dismissError() {
+        lastError = "-"
+        statusMessage = "系统运行中"
+    }
+}
+
+/// Write daemon config file so the Rust daemon can pick up user-configured paths.
+/// Config file: `~/Library/Application Support/com.sanmws.autodev/config.json`
+private func writeDaemonConfig(blobsDir: String) {
+    guard let appSupport = FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask
+    ).first else { return }
+
+    let configDir = appSupport.appendingPathComponent("com.sanmws.autodev")
+    let configFile = configDir.appendingPathComponent("config.json")
+
+    // Read existing config or start fresh
+    var config: [String: Any] = [:]
+    if let data = try? Data(contentsOf: configFile),
+       let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        config = existing
+    }
+
+    config["blobs_dir"] = blobsDir
+
+    guard let data = try? JSONSerialization.data(
+        withJSONObject: config, options: [.prettyPrinted, .sortedKeys]
+    ) else { return }
+
+    try? FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
+    try? data.write(to: configFile, options: .atomic)
 }

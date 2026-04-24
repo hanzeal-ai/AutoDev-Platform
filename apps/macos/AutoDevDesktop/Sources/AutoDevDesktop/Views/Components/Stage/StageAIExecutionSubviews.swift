@@ -50,6 +50,23 @@ enum AIExecutionState {
             return false
         }
     }
+
+    var icon: String {
+        switch self {
+        case .waiting:
+            return "clock"
+        case .waitingFirstDelta:
+            return "arrow.down.circle"
+        case .outputting:
+            return "text.bubble"
+        case .postProcessing:
+            return "gearshape"
+        case .completed:
+            return "checkmark.circle"
+        case .failed:
+            return "xmark.circle"
+        }
+    }
 }
 
 struct AITranscriptMessage: Identifiable {
@@ -186,15 +203,16 @@ struct AIArtifactBlock: View {
                         .foregroundColor(.green)
                         .font(.subheadline)
                     if let path = item.filePath, !path.isEmpty {
-                        Text(fileNameFromPath(path))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(.green)
-                            .underline()
-                            .onTapGesture {
-                                viewModel.openStageDownload(item)
-                            }
-                            .handCursorOnHover()
-                            .help(path)
+                        Button(action: { viewModel.openStageDownload(item) }) {
+                            Text(fileNameFromPath(path))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.green)
+                                .underline()
+                        }
+                        .buttonStyle(.plain)
+                        .handCursorOnHover()
+                        .help(path)
+                        .accessibilityLabel("打开文件 \(fileNameFromPath(path))")
                     } else {
                         Text(item.title)
                             .font(.subheadline.weight(.medium))

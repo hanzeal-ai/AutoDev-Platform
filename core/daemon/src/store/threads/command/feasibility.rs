@@ -7,10 +7,24 @@ use uuid::Uuid;
 
 impl Store {
     pub fn confirm_feasibility(&self, thread_id: &str) -> StoreResult<Value> {
-        let now = now_ms();
-
         self.conn.execute_batch("BEGIN TRANSACTION")
             .map_err(|err| format!("begin transaction failed (confirm_feasibility, thread={}): {}", thread_id, err))?;
+
+        match self.confirm_feasibility_inner(thread_id) {
+            Ok(result) => {
+                self.conn.execute_batch("COMMIT")
+                    .map_err(|err| format!("commit failed (confirm_feasibility, thread={}): {}", thread_id, err))?;
+                Ok(result)
+            }
+            Err(e) => {
+                let _ = self.conn.execute_batch("ROLLBACK");
+                Err(e)
+            }
+        }
+    }
+
+    fn confirm_feasibility_inner(&self, thread_id: &str) -> StoreResult<Value> {
+        let now = now_ms();
 
         let linked_project_id: Option<String> = self
             .conn
@@ -128,7 +142,7 @@ WHERE id = ?2
             )
             .map_err(|err| err.to_string())?;
 
-        if let Err(reason) = self.generate_project_stage_ai(&project_id, Some("prd")) {
+        if let Err(reason) = self.generate_project_stage_ai(&project_id, Some("prd"), None) {
             logger::error_fields(
                 "auto prd ai trigger failed",
                 &[
@@ -138,9 +152,6 @@ WHERE id = ?2
                 ],
             );
         }
-
-        self.conn.execute_batch("COMMIT")
-            .map_err(|err| format!("commit failed (confirm_feasibility, thread={}): {}", thread_id, err))?;
 
         Ok(json!({
             "thread_id": thread_id,

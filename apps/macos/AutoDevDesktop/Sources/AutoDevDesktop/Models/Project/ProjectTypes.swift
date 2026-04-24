@@ -39,6 +39,24 @@ enum DeliveryLifecycleStage: String, CaseIterable, Identifiable {
             return 6
         }
     }
+
+    /// Sub-steps for this stage (matches Rust lifecycle.rs).
+    var subSteps: [(key: String, label: String)] {
+        switch self {
+        case .feasibility:
+            return [("clarification", "需求澄清"), ("report", "可行性报告")]
+        case .ui:
+            return [("page_map", "页面地图"), ("interaction", "交互稿")]
+        case .development:
+            return [("task_breakdown", "任务拆分"), ("coding", "编码实现")]
+        case .testing:
+            return [("test_plan", "测试计划"), ("quality_report", "质量报告")]
+        default:
+            return []
+        }
+    }
+
+    var hasSubSteps: Bool { !subSteps.isEmpty }
 }
 
 enum ProjectRisk: String {

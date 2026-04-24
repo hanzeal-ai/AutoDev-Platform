@@ -7,7 +7,7 @@ pub(super) fn handle_advance(
     inbound: &protocol::EnvelopeIn,
     runtime_paths: &runtime::RuntimePaths,
 ) -> Result<(&'static str, Value), String> {
-    let project_id = inbound.payload_string("project_id")?;
+    let project_id = inbound.payload_string("project_id")?.trim().to_lowercase();
     let payload_obj = inbound.payload_object().ok();
     let action = payload_obj.as_ref().and_then(|payload| {
         payload

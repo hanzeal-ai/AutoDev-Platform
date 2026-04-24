@@ -33,6 +33,8 @@ extension IPCContract {
         static let planDevelopmentSuccess = "command.plan_development.ok"
         static let generateProjectStageAICommand = "command.generate_project_stage_ai"
         static let generateProjectStageAISuccess = "command.generate_project_stage_ai.ok"
+        static let deleteProjectCommand = "command.delete_project"
+        static let deleteProjectSuccess = "command.delete_project.ok"
 
         static let error = "error"
     }

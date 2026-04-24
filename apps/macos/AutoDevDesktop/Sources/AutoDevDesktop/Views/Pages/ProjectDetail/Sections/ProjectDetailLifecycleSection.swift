@@ -6,22 +6,29 @@ struct ProjectDetailLifecycleSection: View {
     var body: some View {
         DashboardCard(title: "生命周期轨道") {
             ProjectDetailLifecycleTrack(
-                current: viewModel.state.selectedProject?.lifecycleStage ?? viewModel.state.activeDetailStage
+                current: viewModel.state.selectedProject?.lifecycleStage ?? viewModel.state.activeDetailStage,
+                viewing: viewModel.state.activeDetailStage,
+                onSelectStage: { stage in
+                    viewModel.selectDetailStage(stage)
+                }
             )
         }
     }
 }
 
-private struct ProjectDetailLifecycleTrack: View {
+struct ProjectDetailLifecycleTrack: View {
     let current: DeliveryLifecycleStage
+    let viewing: DeliveryLifecycleStage
+    let onSelectStage: (DeliveryLifecycleStage) -> Void
 
     var body: some View {
         let stages = DeliveryLifecycleStage.allCases
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(Array(stages.enumerated()), id: \.element.id) { index, stage in
-                    let isCurrent = stage == current
+                    let isViewing = stage == viewing
                     let isReached = stage.order <= current.order
+                    let isClickable = isReached && stage != viewing
 
                     HStack(spacing: 6) {
                         Circle()
@@ -29,19 +36,24 @@ private struct ProjectDetailLifecycleTrack: View {
                             .frame(width: 7, height: 7)
                         Text(stage.rawValue)
                             .font(.caption.weight(.medium))
-                            .foregroundColor(isCurrent ? .primary : .secondary)
+                            .foregroundColor(isViewing ? .primary : .secondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 999, style: .continuous)
-                            .fill(isCurrent ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor))
+                            .fill(isViewing ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 999, style: .continuous)
-                            .stroke(isCurrent ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
+                            .stroke(isViewing ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
                     )
-                    .accessibilityLabel("\(stage.rawValue)\(isCurrent ? "，当前阶段" : "")")
+                    .if(isClickable) { view in
+                        view.onTapGesture { onSelectStage(stage) }
+                    }
+                    .opacity(isClickable ? 1.0 : (isViewing ? 1.0 : 0.6))
+                    .accessibilityLabel("\(stage.rawValue)\(isViewing ? "，正在查看" : (isReached ? "，可点击回溯" : ""))")
+                    .help(isClickable ? "点击查看 \(stage.rawValue) 阶段详情" : "")
 
                     if index < stages.count - 1 {
                         Capsule(style: .circular)
@@ -51,6 +63,17 @@ private struct ProjectDetailLifecycleTrack: View {
                 }
             }
             .padding(.vertical, 2)
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 }

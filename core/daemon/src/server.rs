@@ -8,6 +8,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 pub fn run(runtime_paths: Arc<RuntimePaths>) -> Result<(), Box<dyn Error>> {
     if runtime_paths.socket_path().exists() {
@@ -43,6 +44,7 @@ fn handle_client(
     stream: UnixStream,
     runtime_paths: Arc<RuntimePaths>,
 ) -> Result<(), Box<dyn Error>> {
+    stream.set_read_timeout(Some(Duration::from_secs(60)))?;
     let mut writer = stream.try_clone()?;
     let mut reader = BufReader::new(stream);
     let mut line = String::new();

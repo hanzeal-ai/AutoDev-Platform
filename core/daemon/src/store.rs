@@ -1,4 +1,5 @@
 mod helpers;
+pub(crate) mod lifecycle;
 mod materials;
 mod overview;
 mod projects;
@@ -76,6 +77,18 @@ PRAGMA temp_store = MEMORY;
         Ok(Self {
             conn,
             paths: paths.clone(),
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn open_in_memory() -> StoreResult<Self> {
+        let conn = Connection::open_in_memory()
+            .map_err(|err| format!("failed to open in-memory database: {}", err))?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .map_err(|err| err.to_string())?;
+        Ok(Self {
+            conn,
+            paths: RuntimePaths::test_defaults(),
         })
     }
 }

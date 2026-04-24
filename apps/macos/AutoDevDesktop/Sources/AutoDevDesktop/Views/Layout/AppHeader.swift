@@ -9,6 +9,7 @@ struct AppHeader: View {
                 Image(systemName: viewModel.state.isSidebarCollapsed ? "sidebar.right" : "sidebar.left")
             }
             .buttonStyle(.bordered)
+            .accessibilityLabel(viewModel.state.isSidebarCollapsed ? "展开侧边栏" : "收起侧边栏")
 
             if viewModel.state.route.isProjectDetail || viewModel.state.route.isProjectCreation {
                 Button(action: navigateBack) {
@@ -47,6 +48,7 @@ struct AppHeader: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.isChecking)
+                .accessibilityLabel("刷新系统状态")
             }
         }
         .padding(.horizontal, 20)
@@ -80,14 +82,16 @@ private struct HeaderStatusLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(AutoDevViewTheme.daemonStatusColor(status))
-                .frame(width: 8, height: 8)
+            Image(systemName: AutoDevViewTheme.daemonStatusIcon(status))
+                .foregroundColor(AutoDevViewTheme.daemonStatusColor(status))
+                .font(.caption)
             Text("系统 \(status)")
                 .font(.subheadline.weight(.semibold))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("系统状态：\(status)")
     }
 }

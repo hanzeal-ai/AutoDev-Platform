@@ -94,8 +94,18 @@ struct DeliveryExecutionDetail: Equatable {
     var riskItems: [String] = []
     var primaryAction: String = "继续"
     var secondaryActions: [String] = []
+    var eventFlow: [String] = []
     var downloads: [StageDownloadItem] = []
     var workUnits: [DeliveryWorkUnitItem] = []
+    var subSteps: [DeliverySubStepItem] = []
+    var activeSubStep: String?
+}
+
+struct DeliverySubStepItem: Identifiable, Equatable {
+    let id: String
+    var key: String
+    var label: String
+    var hasContent: Bool
 }
 
 struct StageViewBlueprint: Equatable {

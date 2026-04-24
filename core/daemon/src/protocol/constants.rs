@@ -32,5 +32,7 @@ pub const MESSAGE_COMMAND_PLAN_DEVELOPMENT_OK: &str = "command.plan_development.
 pub const MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI: &str = "command.generate_project_stage_ai";
 pub const MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI_OK: &str =
     "command.generate_project_stage_ai.ok";
+pub const MESSAGE_COMMAND_DELETE_PROJECT: &str = "command.delete_project";
+pub const MESSAGE_COMMAND_DELETE_PROJECT_OK: &str = "command.delete_project.ok";
 
 pub const MESSAGE_ERROR: &str = "error";

@@ -145,7 +145,6 @@
             "OBJ_123",
             "OBJ_124",
             "OBJ_125",
-            "OBJ_126",
             "OBJ_127",
             "OBJ_128",
             "OBJ_129",
@@ -185,12 +184,6 @@
             "OBJ_163",
             "OBJ_164",
             "OBJ_165",
-            "OBJ_231",
-            "OBJ_232",
-            "OBJ_233",
-            "OBJ_234",
-            "OBJ_235",
-            "OBJ_236",
             "OBJ_237",
             "OBJ_238",
             "OBJ_239",
@@ -241,7 +234,13 @@
             "OBJ_325",
             "OBJ_327",
             "OBJ_329",
-            "OBJ_331"
+            "OBJ_331",
+            "OBJ_333",
+            "OBJ_336",
+            "OBJ_338",
+            "OBJ_340",
+            "OBJ_342",
+            "OBJ_344"
          );
       };
       "OBJ_106" = {
@@ -345,10 +344,7 @@
          isa = "PBXBuildFile";
          fileRef = "OBJ_42";
       };
-      "OBJ_126" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_43";
-      };
+
       "OBJ_127" = {
          isa = "PBXBuildFile";
          fileRef = "OBJ_44";
@@ -609,20 +605,6 @@
          isa = "PBXBuildFile";
          fileRef = "OBJ_6";
       };
-      "OBJ_200" = {
-         isa = "PBXGroup";
-         children = (
-            "OBJ_210",
-            "OBJ_211",
-            "OBJ_212",
-            "OBJ_213",
-            "OBJ_214",
-            "OBJ_215"
-         );
-         name = "DaemonMapping";
-         path = "DaemonMapping";
-         sourceTree = "<group>";
-      };
       "OBJ_201" = {
          isa = "PBXGroup";
          children = (
@@ -661,36 +643,6 @@
          );
          name = "Components";
          path = "Components";
-         sourceTree = "<group>";
-      };
-      "OBJ_210" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMappingOverview.swift";
-         sourceTree = "<group>";
-      };
-      "OBJ_211" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMappingProjects.swift";
-         sourceTree = "<group>";
-      };
-      "OBJ_212" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMappingCreation.swift";
-         sourceTree = "<group>";
-      };
-      "OBJ_213" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMappingStageDetail.swift";
-         sourceTree = "<group>";
-      };
-      "OBJ_214" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMappingStageDownloads.swift";
-         sourceTree = "<group>";
-      };
-      "OBJ_215" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMappingHelpers.swift";
          sourceTree = "<group>";
       };
       "OBJ_216" = {
@@ -767,30 +719,6 @@
          isa = "PBXFileReference";
          path = "CollapsedCreationRail.swift";
          sourceTree = "<group>";
-      };
-      "OBJ_231" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_210";
-      };
-      "OBJ_232" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_211";
-      };
-      "OBJ_233" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_212";
-      };
-      "OBJ_234" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_213";
-      };
-      "OBJ_235" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_214";
-      };
-      "OBJ_236" = {
-         isa = "PBXBuildFile";
-         fileRef = "OBJ_215";
       };
       "OBJ_237" = {
          isa = "PBXBuildFile";
@@ -1268,6 +1196,24 @@
          isa = "PBXBuildFile";
          fileRef = "OBJ_330";
       };
+      "OBJ_335" = {
+         isa = "PBXFileReference";
+         path = "StageAIExecutionHelper.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_336" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_335";
+      };
+      "OBJ_339" = {
+         isa = "PBXFileReference";
+         path = "StageSubStepTrack.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_340" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_339";
+      };
       "OBJ_18" = {
          isa = "PBXFileReference";
          path = "DaemonCommandDTO.swift";
@@ -1418,10 +1364,39 @@
          isa = "PBXGroup";
          children = (
             "OBJ_35",
+            "OBJ_334",
             "OBJ_38"
          );
          name = "Services";
          path = "Services";
+         sourceTree = "<group>";
+      };
+      "OBJ_332" = {
+         isa = "PBXFileReference";
+         path = "DomainMapper.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_333" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_332";
+      };
+      "OBJ_341" = {
+         isa = "PBXFileReference";
+         path = "DomainMapperStageDetail.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_342" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_341";
+      };
+      "OBJ_334" = {
+         isa = "PBXGroup";
+         children = (
+            "OBJ_332",
+            "OBJ_341"
+         );
+         name = "DomainMapping";
+         path = "DomainMapping";
          sourceTree = "<group>";
       };
       "OBJ_35" = {
@@ -1500,8 +1475,6 @@
             "OBJ_41",
             "OBJ_42",
             "OBJ_254",
-            "OBJ_43",
-            "OBJ_200",
             "OBJ_201",
             "OBJ_44",
             "OBJ_45",
@@ -1509,6 +1482,7 @@
             "OBJ_47",
             "OBJ_48",
             "OBJ_49",
+            "OBJ_343",
             "OBJ_50",
             "OBJ_255",
             "OBJ_51",
@@ -1530,11 +1504,7 @@
          path = "ShellViewModelCreation.swift";
          sourceTree = "<group>";
       };
-      "OBJ_43" = {
-         isa = "PBXFileReference";
-         path = "ShellViewModelDaemonMapping.swift";
-         sourceTree = "<group>";
-      };
+
       "OBJ_44" = {
          isa = "PBXFileReference";
          path = "ShellViewModelDownloads.swift";
@@ -1564,6 +1534,15 @@
          isa = "PBXFileReference";
          path = "ShellViewModelSettings.swift";
          sourceTree = "<group>";
+      };
+      "OBJ_343" = {
+         isa = "PBXFileReference";
+         path = "ShellViewModelStageAdvance.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_344" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_343";
       };
       "OBJ_5" = {
          isa = "PBXGroup";
@@ -1638,11 +1617,21 @@
          isa = "PBXGroup";
          children = (
             "OBJ_59",
-            "OBJ_60"
+            "OBJ_60",
+            "OBJ_337"
          );
          name = "Foundation";
          path = "Foundation";
          sourceTree = "<group>";
+      };
+      "OBJ_337" = {
+         isa = "PBXFileReference";
+         path = "ErrorBannerView.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_338" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_337";
       };
       "OBJ_59" = {
          isa = "PBXFileReference";
@@ -1708,7 +1697,9 @@
             "OBJ_320",
             "OBJ_322",
             "OBJ_324",
-            "OBJ_330"
+            "OBJ_330",
+            "OBJ_335",
+            "OBJ_339"
          );
          name = "Stage";
          path = "Stage";

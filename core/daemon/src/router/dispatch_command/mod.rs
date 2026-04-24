@@ -1,6 +1,7 @@
 mod advance_project_stage;
 mod creation_messages;
 mod creation_threads;
+mod delete_project;
 mod feasibility;
 mod generate_project_stage_ai;
 mod materials;
@@ -45,6 +46,9 @@ pub(super) fn dispatch(
         protocol::MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI => Some(
             generate_project_stage_ai::handle_generate(inbound, runtime_paths),
         ),
+        protocol::MESSAGE_COMMAND_DELETE_PROJECT => {
+            Some(delete_project::handle_delete(inbound, runtime_paths))
+        }
         _ => None,
     }
 }

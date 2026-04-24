@@ -118,22 +118,61 @@ struct SettingsSheetView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
 
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 2) {
                             ForEach(DeliveryLifecycleStage.allCases) { stage in
-                                Toggle(
-                                    stage.rawValue,
-                                    isOn: Binding(
-                                        get: { viewModel.state.stageAutomation.manualConfirmStages.contains(stage) },
-                                        set: { _ in viewModel.toggleManualConfirmStage(stage) }
-                                    )
-                                )
-                                .font(.subheadline)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Toggle(
+                                        isOn: Binding(
+                                            get: { viewModel.state.stageAutomation.manualConfirmStages.contains(stage) },
+                                            set: { _ in viewModel.toggleManualConfirmStage(stage) }
+                                        )
+                                    ) {
+                                        HStack(spacing: 6) {
+                                            Text(stage.rawValue)
+                                                .font(.subheadline.weight(.medium))
+                                            if stage.hasSubSteps {
+                                                Text("\(stage.subSteps.count) 步")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                    .padding(.horizontal, 5)
+                                                    .padding(.vertical, 1)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                                            .fill(Color.secondary.opacity(0.12))
+                                                    )
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 3)
+
+                                    if stage.hasSubSteps {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            ForEach(Array(stage.subSteps.enumerated()), id: \.offset) { index, step in
+                                                HStack(spacing: 6) {
+                                                    Circle()
+                                                        .fill(Color.accentColor.opacity(0.5))
+                                                        .frame(width: 5, height: 5)
+                                                    Text(step.label)
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                    if index < stage.subSteps.count - 1 {
+                                                        Image(systemName: "arrow.right")
+                                                            .font(.system(size: 8))
+                                                            .foregroundColor(.secondary.opacity(0.5))
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .padding(.leading, 24)
+                                        .padding(.bottom, 4)
+                                    }
+                                }
                             }
                         }
                         .padding(.top, 4)
 
                         Toggle(
-                            "分步操作也需人工推进",
+                            "子步骤之间也需人工确认推进",
                             isOn: Binding(
                                 get: { viewModel.state.stageAutomation.manualSubSteps },
                                 set: { viewModel.setManualSubSteps($0) }

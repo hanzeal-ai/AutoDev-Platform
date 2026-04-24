@@ -31,6 +31,13 @@ if [[ ! -d "$VENV_DIR" ]]; then
 fi
 
 PORT="${AI_WORKER_PORT:-9720}"
+
+# Skip if already running on the target port
+if lsof -iTCP:"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+  echo "AI Worker already running on port $PORT, skipping."
+  exit 0
+fi
+
 echo "Starting AI Worker on port $PORT..."
 exec "$VENV_DIR/bin/uvicorn" autodev_ai.main:app \
   --host 127.0.0.1 \

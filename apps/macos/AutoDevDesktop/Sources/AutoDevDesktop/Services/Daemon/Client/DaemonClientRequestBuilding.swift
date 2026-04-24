@@ -1,10 +1,13 @@
 import Foundation
 
 extension DaemonClient {
-    static func projectStageDetailPayload(projectID: String, stage: String?) -> [String: Any] {
+    static func projectStageDetailPayload(projectID: String, stage: String?, subStep: String? = nil) -> [String: Any] {
         var payload: [String: Any] = ["project_id": projectID]
         if let stage = stage {
             payload["stage"] = stage
+        }
+        if let subStep = subStep {
+            payload["sub_step"] = subStep
         }
         return payload
     }
@@ -38,6 +41,10 @@ extension DaemonClient {
         ["project_id": projectID]
     }
 
+    static func projectIDPayload(_ projectID: String) -> [String: Any] {
+        ["project_id": projectID]
+    }
+
     static func advanceProjectStagePayload(projectID: String, action: String, autoTriggerAI: Bool) -> [String: Any] {
         [
             "project_id": projectID,
@@ -46,10 +53,13 @@ extension DaemonClient {
         ]
     }
 
-    static func generateProjectStageAIPayload(projectID: String, stage: String?) -> [String: Any] {
+    static func generateProjectStageAIPayload(projectID: String, stage: String?, feedback: String?) -> [String: Any] {
         var payload: [String: Any] = ["project_id": projectID]
         if let stage {
             payload["stage"] = stage
+        }
+        if let feedback, !feedback.isEmpty {
+            payload["feedback"] = feedback
         }
         return payload
     }

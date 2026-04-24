@@ -6,52 +6,53 @@ struct ProjectDetailPage: View {
     var body: some View {
         Group {
             if let project = viewModel.state.selectedProject {
+                let detail = viewModel.state.selectedExecutionDetail
+                let subSteps = detail?.subSteps ?? []
+                let activeSubStep = detail?.activeSubStep ?? subSteps.first?.key ?? ""
+
                 VStack(spacing: AutoDevViewTheme.pageSpacing) {
-                    if let detail = viewModel.state.selectedExecutionDetail {
+                    // Decision bar
+                    if let detail {
                         ProjectDetailDecisionSection(viewModel: viewModel, detail: detail)
                     } else {
                         ProjectDetailDecisionFallbackSection(viewModel: viewModel)
                     }
-                    ProjectDetailLifecycleSection(viewModel: viewModel)
 
+                    // Lifecycle track + sub-step track
+                    DashboardCard(title: "生命周期轨道") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ProjectDetailLifecycleTrack(
+                                current: project.lifecycleStage,
+                                viewing: viewModel.state.activeDetailStage,
+                                onSelectStage: { viewModel.selectDetailStage($0) }
+                            )
+                            if !subSteps.isEmpty {
+                                StageSubStepTrack(
+                                    subSteps: subSteps,
+                                    activeSubStep: activeSubStep,
+                                    onSelect: { viewModel.selectSubStep($0) }
+                                )
+                            }
+                        }
+                    }
+
+                    // AI execution progress (skip for feasibility chat)
                     if viewModel.state.activeDetailStage != .feasibility,
-                       let detail = viewModel.state.selectedExecutionDetail
+                       let detail
                     {
-                        let stageDownloads = viewModel.state.selectedStageDownloads
                         StageAIExecutionProgressView(
                             viewModel: viewModel,
                             stage: viewModel.state.activeDetailStage,
                             detail: detail,
-                            downloads: stageDownloads
+                            downloads: viewModel.state.selectedStageDownloads
                         )
                     }
 
-                    if viewModel.state.activeDetailStage == .development {
-                        DashboardCard(title: "当前阶段工作区") {
-                            detailStageWorkspace(project: project, detail: viewModel.state.selectedExecutionDetail)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .top)
-                    } else {
-                        if let detail = viewModel.state.selectedExecutionDetail {
-                            HStack(alignment: .top, spacing: AutoDevViewTheme.pageSpacing) {
-                                DashboardCard(title: "当前阶段工作区") {
-                                    detailStageWorkspace(project: project, detail: detail)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .top)
-
-                                VStack(spacing: AutoDevViewTheme.pageSpacing) {
-                                    ProjectDetailRiskSection(detail: detail)
-                                    ProjectDetailEventSection(detail: detail)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .top)
-                            }
-                        } else {
-                            DashboardCard(title: "当前阶段工作区") {
-                                detailStageWorkspace(project: project, detail: nil)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .top)
-                        }
+                    // Stage workspace — full width for all stages
+                    DashboardCard(title: stageWorkspaceTitle) {
+                        detailStageWorkspace(project: project, detail: detail)
                     }
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
             } else {
                 DashboardCard(title: "阶段详情") {
@@ -60,6 +61,17 @@ struct ProjectDetailPage: View {
                 }
             }
         }
+    }
+
+    private var stageWorkspaceTitle: String {
+        let stage = viewModel.state.activeDetailStage
+        let subStep = viewModel.state.selectedSubStep
+        let detail = viewModel.state.selectedExecutionDetail
+        if let subStep,
+           let match = detail?.subSteps.first(where: { $0.key == subStep }) {
+            return "\(stage.rawValue) · \(match.label)"
+        }
+        return stage.rawValue
     }
 }
 

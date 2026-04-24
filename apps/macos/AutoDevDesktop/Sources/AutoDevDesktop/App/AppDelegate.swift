@@ -6,5 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         _ = DaemonBootstrapper.launchIfNeeded()
+        _ = DaemonBootstrapper.launchAIWorkerIfNeeded()
     }
 }

@@ -32,6 +32,11 @@ extension ShellViewState {
 
     mutating func selectDetailStage(_ stage: DeliveryLifecycleStage) {
         selectedDetailStage = stage
+        selectedSubStep = nil
+    }
+
+    mutating func selectSubStep(_ subStep: String) {
+        selectedSubStep = subStep
     }
 
     mutating func toggleSidebar() {

@@ -41,10 +41,10 @@ extension DaemonClient {
         }
     }
 
-    func getProjectStageDetail(projectID: String, stage: String?) async throws -> DaemonProjectStageDetail {
+    func getProjectStageDetail(projectID: String, stage: String?, subStep: String? = nil) async throws -> DaemonProjectStageDetail {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.getProjectStageDetailQuery,
-            payload: Self.projectStageDetailPayload(projectID: projectID, stage: stage),
+            payload: Self.projectStageDetailPayload(projectID: projectID, stage: stage, subStep: subStep),
             expectedResponse: IPCContract.MessageType.getProjectStageDetailSuccess
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonProjectStageDetailPayload.self, from: payload).detail

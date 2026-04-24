@@ -13,17 +13,17 @@ extension ShellViewModel {
         async let projects = daemonClient.listProjects()
         let (resolvedOverview, resolvedProjects) = try await (overview, projects)
 
-        state.opsSnapshot = Self.mapOpsSnapshot(resolvedOverview.opsSnapshot)
-        state.managedAlerts = resolvedOverview.managedAlerts.compactMap { Self.mapAlert($0) }
-        state.progressNotices = resolvedOverview.progressNotices.compactMap { Self.mapProgressNotice($0) }
-        state.interventions = resolvedOverview.interventions.compactMap { Self.mapIntervention($0) }
-        state.lifecycleDistribution = resolvedOverview.lifecycleDistribution.map { Self.mapLifecycleStageItem($0) }
-        state.projects = resolvedProjects.compactMap { Self.mapProject($0) }
+        state.opsSnapshot = DomainMapper.mapOpsSnapshot(resolvedOverview.opsSnapshot)
+        state.managedAlerts = resolvedOverview.managedAlerts.compactMap { DomainMapper.mapAlert($0) }
+        state.progressNotices = resolvedOverview.progressNotices.compactMap { DomainMapper.mapProgressNotice($0) }
+        state.interventions = resolvedOverview.interventions.compactMap { DomainMapper.mapIntervention($0) }
+        state.lifecycleDistribution = resolvedOverview.lifecycleDistribution.map { DomainMapper.mapLifecycleStageItem($0) }
+        state.projects = resolvedProjects.compactMap { DomainMapper.mapProject($0) }
     }
 
     func refreshCreationThreads() async throws {
         let threads = try await daemonClient.listCreationThreads()
-        state.replaceCreationThreads(threads.compactMap { Self.mapCreationThread($0) })
+        state.replaceCreationThreads(threads.compactMap { DomainMapper.mapCreationThread($0) })
     }
 
     func scheduleSelectedProjectDetailRefresh() {
@@ -43,12 +43,13 @@ extension ShellViewModel {
         do {
             let detail = try await daemonClient.getProjectStageDetail(
                 projectID: requestKey.projectID.uuidString,
-                stage: Self.stageKey(requestKey.stage)
+                stage: DomainMapper.stageKey(requestKey.stage),
+                subStep: state.selectedSubStep
             )
             guard !Task.isCancelled, state.selectedExecutionDetailKey == requestKey else {
                 return
             }
-            let mappedDetail = Self.mapStageDetail(detail)
+            let mappedDetail = DomainMapper.mapStageDetail(detail)
             state.executionDetails[requestKey] = mappedDetail
             scheduleStageAIDetailPollingIfNeeded(detail: mappedDetail, requestKey: requestKey)
         } catch is CancellationError {
@@ -61,7 +62,7 @@ extension ShellViewModel {
         }
     }
 
-    func generateAIForSelectedStage() {
+    func generateAIForSelectedStage(feedback: String? = nil) {
         guard dataMode == .liveDaemon else {
             state.statusMessage = "预览模式不能触发后台 AI"
             return
@@ -73,13 +74,15 @@ extension ShellViewModel {
         guard !isGeneratingStageAI else { return }
 
         isGeneratingStageAI = true
-        state.statusMessage = "后台 AI 已启动..."
-        Task { @MainActor in
+        state.statusMessage = feedback != nil ? "根据反馈重新生成中..." : "后台 AI 已启动..."
+        Task { [weak self] in
+            guard let self else { return }
             defer { isGeneratingStageAI = false }
             do {
                 _ = try await daemonClient.generateProjectStageAI(
                     projectID: requestKey.projectID.uuidString,
-                    stage: Self.stageKey(requestKey.stage)
+                    stage: DomainMapper.stageKey(requestKey.stage),
+                    feedback: feedback
                 )
                 guard state.selectedExecutionDetailKey == requestKey else { return }
                 state.statusMessage = "后台 AI 流式生成中..."

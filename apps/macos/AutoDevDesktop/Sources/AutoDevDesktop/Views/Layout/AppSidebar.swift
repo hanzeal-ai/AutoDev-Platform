@@ -70,6 +70,7 @@ struct AppSidebar: View {
             }
             .menuStyle(.borderlessButton)
             .help("用户中心")
+            .accessibilityLabel("用户菜单，\(viewModel.state.userProfile.displayName)")
         }
         .padding(10)
         .frame(width: viewModel.state.isSidebarCollapsed ? 58 : 146, alignment: .topLeading)
@@ -107,5 +108,7 @@ private struct SidebarButton: View {
         }
         .buttonStyle(.plain)
         .help(title)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

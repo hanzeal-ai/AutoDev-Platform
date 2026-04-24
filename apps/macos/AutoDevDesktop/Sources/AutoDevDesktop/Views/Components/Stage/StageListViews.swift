@@ -12,15 +12,16 @@ struct StageArtifactListView: View {
                         .foregroundColor(.green)
                         .font(.subheadline)
                     if let filePath = item.filePath, !filePath.isEmpty {
-                        Text(fileNameFromPath(filePath))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(.green)
-                            .underline()
-                            .onTapGesture {
-                                viewModel.openFilePath(filePath)
-                            }
-                            .handCursorOnHover()
-                            .help(filePath)
+                        Button(action: { viewModel.openFilePath(filePath) }) {
+                            Text(fileNameFromPath(filePath))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.green)
+                                .underline()
+                        }
+                        .buttonStyle(.plain)
+                        .handCursorOnHover()
+                        .help(filePath)
+                        .accessibilityLabel("打开文件 \(fileNameFromPath(filePath))")
                     } else {
                         Text(item.name)
                             .font(.subheadline.weight(.medium))
@@ -52,9 +53,10 @@ struct StageProgressListView: View {
         VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
             ForEach(items) { item in
                 HStack(alignment: .center, spacing: 10) {
-                    Circle()
-                        .fill(item.status.color)
-                        .frame(width: 8, height: 8)
+                    Image(systemName: item.status.icon)
+                        .foregroundColor(item.status.color)
+                        .font(.caption)
+                        .frame(width: 14, height: 14)
                     Text(item.title)
                         .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,6 +66,8 @@ struct StageProgressListView: View {
                 }
                 .padding(8)
                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(item.title)，\(item.status.rawValue)")
             }
         }
     }

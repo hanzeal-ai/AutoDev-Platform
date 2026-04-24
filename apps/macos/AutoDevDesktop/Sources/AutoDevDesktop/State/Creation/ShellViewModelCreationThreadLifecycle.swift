@@ -10,7 +10,8 @@ extension ShellViewModel {
         case .sampleOnly:
             state.createNewCreationThread()
         case .liveDaemon:
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     let result = try await daemonClient.createCreationThread()
                     try await refreshCreationThreads()
@@ -30,7 +31,8 @@ extension ShellViewModel {
         case .sampleOnly:
             state.archiveCreationThread(threadID)
         case .liveDaemon:
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     try await daemonClient.archiveCreationThread(threadID: threadID.uuidString)
                     try await refreshCreationThreads()
@@ -46,7 +48,8 @@ extension ShellViewModel {
         case .sampleOnly:
             state.deleteCreationThread(threadID)
         case .liveDaemon:
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     try await daemonClient.deleteCreationThread(threadID: threadID.uuidString)
                     try await refreshCreationThreads()
@@ -75,7 +78,8 @@ extension ShellViewModel {
             guard let threadID = state.renameThreadTargetID else {
                 return
             }
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     try await daemonClient.renameCreationThread(threadID: threadID.uuidString, title: draft)
                     state.dismissRenameCreationThread()

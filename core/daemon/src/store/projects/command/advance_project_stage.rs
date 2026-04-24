@@ -1,4 +1,5 @@
-use super::super::super::helpers::{now_ms, stage_defaults, stage_label, to_json_string};
+use super::super::super::helpers::{now_ms, to_json_string};
+use super::super::super::lifecycle::LifecycleStage;
 use super::super::super::{StageDefaults, Store, StoreResult};
 use crate::logger;
 use rusqlite::params;
@@ -13,7 +14,7 @@ impl Store {
     ) -> StoreResult<Value> {
         let project_id = project_id.trim().to_lowercase();
         let now = now_ms();
-        let (title, current_stage): (String, String) = self
+        let (title, current_stage_str): (String, String) = self
             .conn
             .query_row(
                 "SELECT title, lifecycle_stage FROM projects WHERE id = ?1",
@@ -22,20 +23,22 @@ impl Store {
             )
             .map_err(|err| err.to_string())?;
 
-        let Some(next_stage) = next_stage(&current_stage) else {
-            self.mark_project_completed(&project_id, &current_stage, now)?;
+        let current_stage = LifecycleStage::from_str(&current_stage_str)
+            .ok_or_else(|| format!("unknown lifecycle stage: {current_stage_str}"))?;
+
+        let Some(next) = current_stage.next() else {
+            self.mark_project_completed(&project_id, current_stage, now)?;
             return Ok(json!({
                 "project_id": project_id,
-                "stage": current_stage,
+                "stage": current_stage.as_str(),
                 "status": "completed",
                 "action": action.unwrap_or("complete")
             }));
         };
 
-        self.mark_stage_completed(&project_id, &current_stage, now)?;
-        self.upsert_next_stage(&project_id, next_stage, now)?;
+        self.mark_stage_completed(&project_id, current_stage, now)?;
+        self.upsert_next_stage(&project_id, next, now)?;
 
-        let next_label = stage_label(next_stage);
         self.conn
             .execute(
                 r#"
@@ -52,11 +55,11 @@ WHERE id = ?1
 "#,
                 params![
                     &project_id,
-                    next_stage,
-                    next_label,
-                    stage_progress(next_stage),
-                    stage_goal(next_stage),
-                    stage_next_action(next_stage),
+                    next.as_str(),
+                    next.label(),
+                    next.progress(),
+                    next.goal(),
+                    next.next_action(),
                     now,
                 ],
             )
@@ -68,21 +71,21 @@ WHERE id = ?1
                 params![
                     format!("{}-{}-advance", project_id, now),
                     &project_id,
-                    next_stage,
+                    next.as_str(),
                     "阶段已进入",
-                    format!("{} 已进入 {}", title, next_label),
+                    format!("{} 已进入 {}", title, next.label()),
                     now,
                 ],
             )
             .map_err(|err| err.to_string())?;
 
         if auto_trigger_ai {
-            if let Err(reason) = self.generate_project_stage_ai(&project_id, Some(next_stage)) {
+            if let Err(reason) = self.generate_project_stage_ai(&project_id, Some(next.as_str()), None) {
                 logger::error_fields(
                     "auto stage ai trigger failed",
                     &[
                         ("project_id", project_id.clone()),
-                        ("stage", next_stage.to_string()),
+                        ("stage", next.as_str().to_string()),
                         ("reason", reason),
                     ],
                 );
@@ -91,14 +94,14 @@ WHERE id = ?1
 
         Ok(json!({
             "project_id": project_id,
-            "stage": next_stage,
-            "previous_stage": current_stage,
+            "stage": next.as_str(),
+            "previous_stage": current_stage.as_str(),
             "status": "awaiting_confirmation",
             "action": action.unwrap_or("advance")
         }))
     }
 
-    fn mark_project_completed(&self, project_id: &str, stage: &str, now: i64) -> StoreResult<()> {
+    fn mark_project_completed(&self, project_id: &str, stage: LifecycleStage, now: i64) -> StoreResult<()> {
         self.mark_stage_completed(project_id, stage, now)?;
         self.conn
             .execute(
@@ -118,8 +121,8 @@ WHERE id = ?1
         Ok(())
     }
 
-    fn mark_stage_completed(&self, project_id: &str, stage: &str, now: i64) -> StoreResult<()> {
-        let defaults = stage_defaults(stage);
+    fn mark_stage_completed(&self, project_id: &str, stage: LifecycleStage, now: i64) -> StoreResult<()> {
+        let defaults = stage.defaults();
         self.conn
             .execute(
                 r#"
@@ -136,7 +139,7 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
 "#,
                 params![
                     project_id,
-                    stage,
+                    stage.as_str(),
                     defaults.objective,
                     to_json_string(&defaults.input_contexts),
                     to_json_string(&completed_steps(&defaults)),
@@ -151,7 +154,7 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
         Ok(())
     }
 
-    fn upsert_next_stage(&self, project_id: &str, stage: &str, now: i64) -> StoreResult<()> {
+    fn upsert_next_stage(&self, project_id: &str, stage: LifecycleStage, now: i64) -> StoreResult<()> {
         self.conn
             .execute(
                 r#"
@@ -172,7 +175,7 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
 "#,
                 params![
                     project_id,
-                    stage,
+                    stage.as_str(),
                     "",
                     "[]",
                     "[]",
@@ -187,54 +190,6 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
             )
             .map_err(|err| err.to_string())?;
         Ok(())
-    }
-}
-
-fn next_stage(stage: &str) -> Option<&'static str> {
-    match stage {
-        "feasibility" => Some("prd"),
-        "prd" => Some("ui"),
-        "ui" => Some("development"),
-        "development" => Some("testing"),
-        "testing" => Some("release"),
-        "release" => Some("maintenance"),
-        _ => None,
-    }
-}
-
-fn stage_progress(stage: &str) -> f64 {
-    match stage {
-        "prd" => 0.12,
-        "ui" => 0.28,
-        "development" => 0.45,
-        "testing" => 0.72,
-        "release" => 0.9,
-        "maintenance" => 1.0,
-        _ => 0.08,
-    }
-}
-
-fn stage_goal(stage: &str) -> &'static str {
-    match stage {
-        "prd" => "冻结 PRD 范围边界、功能拆分与验收标准",
-        "ui" => "完成页面地图、交互流与关键组件定义",
-        "development" => "完成前后端任务拆分、编码审查循环与稳定预览交付",
-        "testing" => "验证质量门禁并形成发布准入结论",
-        "release" => "完成发布准备、执行与回滚保障",
-        "maintenance" => "监控运行健康并沉淀下一轮优化建议",
-        _ => "完成可行性判断并形成受控立项决策",
-    }
-}
-
-fn stage_next_action(stage: &str) -> &'static str {
-    match stage {
-        "prd" => "确认 PRD 后进入 UI 阶段",
-        "ui" => "当前联调可跳过 UI 并进入研发阶段",
-        "development" => "继续推进研发规划与编码准备",
-        "testing" => "确认质量门禁后进入发布阶段",
-        "release" => "确认发布后进入维护阶段",
-        "maintenance" => "查看维护记录与归档",
-        _ => "确认立项",
     }
 }
 

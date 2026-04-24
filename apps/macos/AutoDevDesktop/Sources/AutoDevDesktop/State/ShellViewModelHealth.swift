@@ -7,7 +7,9 @@ extension ShellViewModel {
         }
 
         hasLoaded = true
+        restoreSidebarState()
         await runHealthCheck()
+        startPeriodicHealthCheck()
     }
 
     func runHealthCheck() async {
@@ -39,5 +41,26 @@ extension ShellViewModel {
                 state.apply(error: error)
             }
         }
+    }
+
+    /// Start a periodic health check that re-probes when daemon is offline.
+    func startPeriodicHealthCheck() {
+        healthCheckTask?.cancel()
+        healthCheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000_000) // 15 seconds
+                guard !Task.isCancelled else { break }
+                guard let self else { break }
+                guard self.dataMode == .liveDaemon else { continue }
+                if self.state.daemonStatus != "OK" {
+                    await self.runHealthCheck()
+                }
+            }
+        }
+    }
+
+    func stopPeriodicHealthCheck() {
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
     }
 }

@@ -11,7 +11,7 @@ pub struct RuntimePaths {
     socket_path: PathBuf,
     data_dir: PathBuf,
     db_path: PathBuf,
-    blobs_dir: PathBuf,
+    default_blobs_dir: PathBuf,
 }
 
 impl RuntimePaths {
@@ -20,14 +20,14 @@ impl RuntimePaths {
         let socket_path = app_support_root.join("ipc").join("daemon.sock");
         let data_dir = app_support_root.join("data");
         let db_path = data_dir.join("app.db");
-        let blobs_dir = app_support_root.join("blobs");
+        let default_blobs_dir = app_support_root.join("blobs");
 
         Ok(Self {
             app_support_root,
             socket_path,
             data_dir,
             db_path,
-            blobs_dir,
+            default_blobs_dir,
         })
     }
 
@@ -43,8 +43,22 @@ impl RuntimePaths {
         &self.db_path
     }
 
-    pub fn blobs_dir(&self) -> &Path {
-        &self.blobs_dir
+    /// Returns the effective blobs directory, checking config.json each time
+    /// so user changes take effect without restarting the daemon.
+    pub fn blobs_dir(&self) -> PathBuf {
+        read_custom_blobs_dir(&self.app_support_root)
+            .unwrap_or_else(|| self.default_blobs_dir.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_defaults() -> Self {
+        Self {
+            app_support_root: PathBuf::from("/tmp/autodev-test"),
+            socket_path: PathBuf::from("/tmp/autodev-test/ipc/daemon.sock"),
+            data_dir: PathBuf::from("/tmp/autodev-test/data"),
+            db_path: PathBuf::from("/tmp/autodev-test/data/app.db"),
+            default_blobs_dir: PathBuf::from("/tmp/autodev-test/blobs"),
+        }
     }
 
     pub fn ensure_runtime_dirs(&self) -> Result<(), Box<dyn Error>> {
@@ -55,7 +69,7 @@ impl RuntimePaths {
         fs::create_dir_all(dir)?;
         fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
         fs::create_dir_all(&self.data_dir)?;
-        fs::create_dir_all(&self.blobs_dir)?;
+        fs::create_dir_all(&self.blobs_dir())?;
         Ok(())
     }
 }
@@ -79,6 +93,7 @@ pub fn health_payload(paths: &RuntimePaths) -> Value {
 
 #[derive(Clone)]
 pub struct DeepSeekConfig {
+    #[allow(dead_code)]
     api_key: String,
     base_url: String,
     model: String,
@@ -88,17 +103,13 @@ impl DeepSeekConfig {
     pub fn from_env() -> Result<Self, String> {
         let api_key = required_env("DEEPSEEK_API_KEY")?;
         let base_url = optional_env("DEEPSEEK_BASE_URL")
-            .unwrap_or_else(|| "https://api.deepseek.com".to_string());
+            .unwrap_or_else(|| "https://api.deepseek.com/v1".to_string());
         let model = optional_env("DEEPSEEK_MODEL").unwrap_or_else(|| "deepseek-chat".to_string());
         Ok(Self {
             api_key,
             base_url: base_url.trim_end_matches('/').to_string(),
             model,
         })
-    }
-
-    pub fn api_key(&self) -> &str {
-        &self.api_key
     }
 
     pub fn endpoint(&self) -> String {
@@ -117,6 +128,26 @@ fn app_support_root() -> Result<PathBuf, Box<dyn Error>> {
     root.push("Application Support");
     root.push("com.sanmws.autodev");
     Ok(root)
+}
+
+/// Read a user-configured blobs directory from the shared config file.
+/// Config file: `{app_support_root}/config.json` with `{"blobs_dir": "/custom/path"}`
+/// Returns None if config file doesn't exist or doesn't contain a valid blobs_dir.
+fn read_custom_blobs_dir(app_support_root: &Path) -> Option<PathBuf> {
+    let config_path = app_support_root.join("config.json");
+    let content = fs::read_to_string(&config_path).ok()?;
+    let config: Value = serde_json::from_str(&content).ok()?;
+    let blobs_dir = config.get("blobs_dir")?.as_str()?;
+    if blobs_dir.is_empty() {
+        return None;
+    }
+    let path = PathBuf::from(blobs_dir);
+    // Only accept absolute paths to prevent path traversal
+    if path.is_absolute() {
+        Some(path)
+    } else {
+        None
+    }
 }
 
 fn required_env(key: &str) -> Result<String, String> {

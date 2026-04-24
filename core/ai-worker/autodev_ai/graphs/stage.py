@@ -17,6 +17,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
 from ..config import ModelConfig
+from ..retry import retry_async
 from ..models import StageContext, StageResult, StepProgress, WorkUnit
 from ..prompts import (
     agent_system_prompt,
@@ -79,11 +80,17 @@ async def agent_node(state: StageState) -> dict:
     full_reply = ""
     deltas: list[str] = []
 
-    async for chunk in llm.astream(messages):
-        delta = chunk.content
-        if delta:
-            full_reply += delta
-            deltas.append(delta)
+    async def _stream_agent():
+        nonlocal full_reply, deltas
+        full_reply = ""
+        deltas = []
+        async for chunk in llm.astream(messages):
+            delta = chunk.content
+            if delta:
+                full_reply += delta
+                deltas.append(delta)
+
+    await retry_async(_stream_agent)
 
     if not full_reply.strip():
         return {"error": "Agent 返回空内容", "agent_reply": "", "deltas": deltas}
@@ -128,7 +135,7 @@ async def synthesizer_node(state: StageState) -> dict:
         )),
     ]
 
-    response = await llm.ainvoke(messages)
+    response = await retry_async(lambda: llm.ainvoke(messages))
     raw_text = response.content
 
     try:
@@ -237,8 +244,10 @@ def _capped_strings(items: list, limit: int) -> list[str]:
 def _extract_json_fallback(raw: str) -> dict | None:
     """Try to extract JSON from code fence or balanced braces."""
     import re
-    # Code fence
-    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", raw, re.DOTALL)
+    # Limit input length to prevent excessive processing
+    raw = raw[:65536]
+    # Code fence — use character class instead of \s* to avoid backtracking
+    m = re.search(r"```(?:json)?[ \t]*\n(.+?)\n[ \t]*```", raw, re.DOTALL)
     if m:
         try:
             return json.loads(m.group(1))

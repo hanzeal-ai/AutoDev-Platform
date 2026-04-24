@@ -1,6 +1,6 @@
 //! HTTP client for the Python AI worker (localhost:9720).
 //!
-//! Falls back to direct DeepSeek calls if the worker is unavailable.
+//! Delegates all AI generation to the Python AI Worker (LangGraph).
 
 use crate::logger;
 use serde_json::{json, Value};
@@ -216,5 +216,51 @@ pub(crate) fn request_report_generation(
 
     serde_json::from_str(&text).map_err(|err| {
         format!("解析 AI Worker report JSON 失败: {err}")
+    })
+}
+
+
+/// Request a chat clarification turn from the Python worker.
+pub(crate) fn request_chat_clarification(
+    thread_id: &str,
+    user_message: &str,
+    draft: &Value,
+    messages: &[Value],
+    materials: &[Value],
+) -> StoreResult<Value> {
+    let url = format!("{}/generate/chat", worker_base_url());
+
+    let body = json!({
+        "thread_id": thread_id,
+        "user_message": user_message,
+        "draft": draft,
+        "messages": messages,
+        "materials": materials,
+    });
+
+    let agent = make_agent(Duration::from_secs(60));
+
+    let response = agent
+        .post(&url)
+        .set("Content-Type", "application/json")
+        .send_json(body)
+        .map_err(|err| {
+            let reason = format!("AI Worker chat 请求失败: {err}");
+            logger::error_fields(
+                "ai_worker chat request failed",
+                &[
+                    ("thread_id", thread_id.to_string()),
+                    ("reason", reason.clone()),
+                ],
+            );
+            reason
+        })?;
+
+    let text = response.into_string().map_err(|err| {
+        format!("读取 AI Worker chat 响应失败: {err}")
+    })?;
+
+    serde_json::from_str(&text).map_err(|err| {
+        format!("解析 AI Worker chat JSON 失败: {err}")
     })
 }

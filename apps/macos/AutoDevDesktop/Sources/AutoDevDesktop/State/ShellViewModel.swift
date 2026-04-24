@@ -17,6 +17,7 @@ final class ShellViewModel: ObservableObject {
     var detailRefreshTask: Task<Void, Never>?
     var stageAIRefreshTask: Task<Void, Never>?
     var autoAdvanceTask: Task<Void, Never>?
+    var healthCheckTask: Task<Void, Never>?
     var autoAdvanceDepth: Int = 0
     static let maxAutoAdvanceDepth = 3
 

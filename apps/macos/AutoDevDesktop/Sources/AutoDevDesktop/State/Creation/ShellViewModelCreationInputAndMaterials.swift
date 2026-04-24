@@ -14,7 +14,8 @@ extension ShellViewModel {
         case .sampleOnly:
             state.addCreationMaterials(urls: urls)
         case .liveDaemon:
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     let threadID = try await resolveActiveCreationThreadIDAfterRefresh()
                     try await daemonClient.addCreationMaterials(
@@ -60,7 +61,8 @@ extension ShellViewModel {
         case .liveDaemon:
             guard !isSendingCreationMessage else { return }
             isSendingCreationMessage = true
-            Task { @MainActor in
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     try await sendCreationInputToDaemon(
                         threadID: threadID,

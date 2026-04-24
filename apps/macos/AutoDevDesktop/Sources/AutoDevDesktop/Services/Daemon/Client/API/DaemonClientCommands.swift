@@ -86,14 +86,22 @@ extension DaemonClient {
         }
     }
 
-    func generateProjectStageAI(projectID: String, stage: String?) async throws -> DaemonCommandResult {
+    func generateProjectStageAI(projectID: String, stage: String?, feedback: String?) async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.generateProjectStageAICommand,
-            payload: Self.generateProjectStageAIPayload(projectID: projectID, stage: stage),
+            payload: Self.generateProjectStageAIPayload(projectID: projectID, stage: stage, feedback: feedback),
             expectedResponse: IPCContract.MessageType.generateProjectStageAISuccess,
             timeoutSeconds: 60
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
         }
+    }
+
+    func deleteProject(projectID: String) async throws {
+        _ = try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.deleteProjectCommand,
+            payload: Self.projectIDPayload(projectID),
+            expectedResponse: IPCContract.MessageType.deleteProjectSuccess
+        ) { _ in true }
     }
 }

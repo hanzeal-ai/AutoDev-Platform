@@ -185,3 +185,79 @@ ON stage_ai_runs(project_id, stage, updated_at_ms DESC);
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schema_creates_all_tables() {
+        let store = Store::open_in_memory().unwrap();
+        store.init_schema().unwrap();
+
+        let mut stmt = store
+            .conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            .unwrap();
+        let tables: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let expected = vec![
+            "creation_messages",
+            "creation_threads",
+            "feasibility_reports",
+            "materials",
+            "project_stages",
+            "projects",
+            "stage_ai_runs",
+            "stage_artifacts",
+            "stage_events",
+        ];
+        assert_eq!(tables, expected);
+    }
+
+    #[test]
+    fn schema_is_idempotent() {
+        let store = Store::open_in_memory().unwrap();
+        store.init_schema().unwrap();
+        store.init_schema().unwrap(); // second call must not error
+    }
+
+    #[test]
+    fn schema_creates_indexes() {
+        let store = Store::open_in_memory().unwrap();
+        store.init_schema().unwrap();
+
+        let count: i64 = store
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(count >= 7, "expected at least 7 indexes, got {count}");
+    }
+
+    #[test]
+    fn schema_migration_adds_columns() {
+        let store = Store::open_in_memory().unwrap();
+        store.init_schema().unwrap();
+
+        let mut stmt = store
+            .conn
+            .prepare("PRAGMA table_info(project_stages)")
+            .unwrap();
+        let columns: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(columns.contains(&"downloads_json".to_string()));
+        assert!(columns.contains(&"work_units_json".to_string()));
+    }
+}

@@ -2,47 +2,52 @@ import SwiftUI
 
 extension ProjectDetailPage {
     func prdWorkspace(detail: DeliveryExecutionDetail?) -> some View {
-        let lines = detail?.inputContexts ?? []
-        let rangeIn = AutoDevTextSupport.value(for: "范围内", in: lines)
-        let rangeOut = AutoDevTextSupport.value(for: "范围外", in: lines)
-        let scene = AutoDevTextSupport.value(for: "核心场景", in: lines)
-        let pending = AutoDevTextSupport.value(for: "待确认点", in: lines)
-        let splitItems = AutoDevTextSupport.filteredArtifacts(detail?.outputArtifacts ?? [], contains: "功能拆分")
-        let acceptanceItems = AutoDevTextSupport.filteredArtifacts(detail?.outputArtifacts ?? [], contains: "验收标准")
+        let contexts = detail?.inputContexts ?? []
+        let steps = detail?.stepProgress ?? []
+        let criteria = detail?.eventFlow ?? []
+        let milestones = detail?.secondaryActions ?? []
         let downloads = stageDownloads(in: [.stageSnapshot, .rawInput, .auditArchive])
         let artifacts = detail?.outputArtifacts ?? []
+        let risks = detail?.riskItems ?? []
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
-            stageModule("进度轨迹", when: !(detail?.stepProgress.isEmpty ?? true)) {
-                StageStepProgressBar(steps: detail?.stepProgress ?? [])
+            stageModule("概述", when: !(detail?.objective.isEmpty ?? true)) {
+                Text(detail?.objective ?? "")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            stageModule("范围与场景", when: rangeIn != nil || rangeOut != nil || scene != nil || pending != nil) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if let rangeIn {
-                        KeyValueRow(key: "范围内", value: rangeIn)
-                    }
-                    if let rangeOut {
-                        KeyValueRow(key: "范围外", value: rangeOut)
-                    }
-                    if let scene {
-                        KeyValueRow(key: "核心场景", value: scene)
-                    }
-                    if let pending {
-                        KeyValueRow(key: "待确认点", value: pending)
+            stageModule("目标与非目标", when: !contexts.isEmpty) {
+                StageBulletsView(items: contexts)
+            }
+
+            stageModule("功能清单", when: !steps.isEmpty) {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(steps) { step in
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(prdStepColor(step.status))
+                                .frame(width: 8, height: 8)
+                            Text(step.title)
+                                .font(.subheadline)
+                                .lineLimit(2)
+                                .foregroundColor(.primary)
+                        }
                     }
                 }
             }
 
-            stageModule("功能与验收", when: !splitItems.isEmpty || !acceptanceItems.isEmpty) {
-                VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-                    if !splitItems.isEmpty {
-                        StageLabeledListView(title: "功能拆分", items: splitItems)
-                    }
-                    if !acceptanceItems.isEmpty {
-                        StageLabeledListView(title: "验收标准", items: acceptanceItems)
-                    }
-                }
+            stageModule("验收标准", when: !criteria.isEmpty) {
+                StageBulletsView(items: criteria)
+            }
+
+            stageModule("里程碑", when: !milestones.isEmpty) {
+                StageBulletsView(items: milestones)
+            }
+
+            stageModule("风险项", when: !risks.isEmpty) {
+                StageBulletsView(items: risks)
             }
 
             stageModule("阶段产物", when: !artifacts.isEmpty || !downloads.isEmpty) {
@@ -55,6 +60,15 @@ extension ProjectDetailPage {
                     }
                 }
             }
+        }
+    }
+
+    private func prdStepColor(_ status: ProjectStatus) -> Color {
+        switch status {
+        case .completed: return .green
+        case .running: return .accentColor
+        case .blocked, .failed: return .red
+        default: return .secondary
         }
     }
 }

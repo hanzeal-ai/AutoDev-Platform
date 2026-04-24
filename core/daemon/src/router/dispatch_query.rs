@@ -44,15 +44,18 @@ pub(super) fn dispatch(
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
-            let stage = match inbound.payload_object() {
-                Ok(payload) => payload.get("stage").and_then(Value::as_str),
-                Err(err) => return Some(Err(err)),
-            };
+            let payload_obj = inbound.payload_object().ok();
+            let stage = payload_obj
+                .as_ref()
+                .and_then(|p| p.get("stage").and_then(Value::as_str));
+            let sub_step = payload_obj
+                .as_ref()
+                .and_then(|p| p.get("sub_step").and_then(Value::as_str));
             let store = store::Store::open(runtime_paths);
             Some(store.and_then(|store| {
                 Ok((
                     protocol::MESSAGE_QUERY_GET_PROJECT_STAGE_DETAIL_OK,
-                    store.get_project_stage_detail(&project_id, stage)?,
+                    store.get_project_stage_detail(&project_id, stage, sub_step)?,
                 ))
             }))
         }

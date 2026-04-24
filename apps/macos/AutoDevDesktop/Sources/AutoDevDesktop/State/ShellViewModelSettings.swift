@@ -25,6 +25,10 @@ extension ShellViewModel {
         state.setLocalStoragePath(path)
     }
 
+    func dismissError() {
+        state.dismissError()
+    }
+
     func setStageAutomationMode(_ mode: StageAutomationMode) {
         state.setStageAutomationMode(mode)
     }

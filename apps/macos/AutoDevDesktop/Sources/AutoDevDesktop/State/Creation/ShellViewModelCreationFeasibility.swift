@@ -7,10 +7,12 @@ extension ShellViewModel {
             state.triggerStageAction("预览模式不支持确认立项")
         case .liveDaemon:
             guard !isConfirmingFeasibility else { return }
+            let capturedThreadID = state.selectedCreationThreadID
             isConfirmingFeasibility = true
-            Task { @MainActor in
+            Task { [weak self] in
+                guard let self else { return }
                 do {
-                    let threadID = try await resolveActiveCreationThreadIDAfterRefresh()
+                    let threadID = try await resolveActiveCreationThreadIDAfterRefresh(expectedThreadID: capturedThreadID)
                     let result = try await daemonClient.confirmFeasibility(threadID: threadID.uuidString)
                     try await refreshLiveSnapshot()
                     if
@@ -36,7 +38,8 @@ extension ShellViewModel {
         case .liveDaemon:
             guard !isConfirmingFeasibility else { return }
             isConfirmingFeasibility = true
-            Task { @MainActor in
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     let resolvedThreadID = try await resolveActiveCreationThreadIDAfterRefresh(expectedThreadID: threadID)
                     let result = try await daemonClient.confirmFeasibility(threadID: resolvedThreadID.uuidString)

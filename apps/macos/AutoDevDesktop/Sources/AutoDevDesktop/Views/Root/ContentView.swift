@@ -62,7 +62,18 @@ struct ContentView: View {
     @ViewBuilder
     private var pageBody: some View {
         Group {
-            if viewModel.state.route.isProjectCreation {
+            if viewModel.state.daemonStatus == "Unknown" {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.regular)
+                    Text("正在连接系统…")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("正在连接系统")
+            } else if viewModel.state.route.isProjectCreation {
                 ProjectCreationPage(viewModel: viewModel)
             } else {
                 ScrollView {

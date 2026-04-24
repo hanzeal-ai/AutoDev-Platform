@@ -28,6 +28,8 @@ struct DaemonProjectStageDetail: Decodable {
     let secondaryActions: [String]
     let riskItems: [String]
     let eventFlow: [String]
+    let subSteps: [DaemonSubStep]?
+    let activeSubStep: String?
 }
 
 struct DaemonStageAIRun: Decodable {
@@ -81,4 +83,10 @@ struct DaemonEvent: Decodable {
     let time: String
     let title: String
     let detail: String
+}
+
+struct DaemonSubStep: Decodable {
+    let key: String
+    let label: String
+    let hasContent: Bool
 }

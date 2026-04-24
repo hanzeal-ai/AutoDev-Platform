@@ -1,5 +1,3 @@
-mod http;
-mod parse;
 pub(crate) mod worker;
 
 use super::super::{Store, StoreResult};
@@ -21,9 +19,6 @@ pub(super) struct MaterialContext {
     pub(super) size_hint: String,
     pub(super) status: String,
 }
-
-pub(crate) use http::request_chat_message_streaming;
-pub(crate) use http::request_json_object;
 
 pub(super) fn list_recent_messages(
     store: &Store,
@@ -93,16 +88,4 @@ LIMIT ?2
     }
     Ok(out)
 }
-
-pub(crate) fn truncate_text(input: &str, max_chars: usize) -> String {
-    let mut out = String::new();
-    for ch in input.chars().take(max_chars) {
-        out.push(ch);
-    }
-    if input.chars().count() > max_chars {
-        out.push_str("...");
-    }
-    out
-}
-
 

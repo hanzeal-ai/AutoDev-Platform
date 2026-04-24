@@ -7,6 +7,7 @@ struct ShellViewState {
     var projectLibrarySearchQuery: String
     var projectDetailBackTarget: ProjectDetailBackTarget
     var selectedDetailStage: DeliveryLifecycleStage?
+    var selectedSubStep: String?
     var selectedCreationThreadID: UUID?
     var selectedCreationThreadIndex: Int?
     var creationInputDraft: String

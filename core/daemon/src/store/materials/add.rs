@@ -45,7 +45,7 @@ pub(super) fn add_creation_materials(
         let dest = material_dest(store, &material_id, &name);
         ensure_parent_dir(&dest)?;
 
-        let size_hint = copy_or_stub_material(&source, &dest)?;
+        let (size_hint, analysis_status) = copy_or_stub_material(&source, &dest)?;
         persist_material_record(
             store,
             thread_id,
@@ -53,6 +53,7 @@ pub(super) fn add_creation_materials(
             &name,
             &type_hint,
             &size_hint,
+            &analysis_status,
             now,
             &dest,
         )?;
@@ -80,12 +81,12 @@ fn material_dest(store: &Store, material_id: &str, name: &str) -> PathBuf {
         .join(format!("{material_id}-{name}"))
 }
 
-fn copy_or_stub_material(source: &Path, dest: &Path) -> StoreResult<String> {
+fn copy_or_stub_material(source: &Path, dest: &Path) -> StoreResult<(String, String)> {
     if source.exists() {
         fs::copy(source, dest)
             .map_err(|err| format!("fs::copy {} -> {}: {}", source.display(), dest.display(), err))?;
         match fs::metadata(dest) {
-            Ok(meta) => Ok(human_file_size(meta.len())),
+            Ok(meta) => Ok((human_file_size(meta.len()), "completed".to_string())),
             Err(err) => {
                 let _ = fs::remove_file(dest);
                 Err(err.to_string())
@@ -94,7 +95,7 @@ fn copy_or_stub_material(source: &Path, dest: &Path) -> StoreResult<String> {
     } else {
         fs::write(dest, format!("原始路径不存在：{}", source.display()))
             .map_err(|err| err.to_string())?;
-        Ok("待识别".to_string())
+        Ok(("待识别".to_string(), "queued".to_string()))
     }
 }
 
@@ -105,6 +106,7 @@ fn persist_material_record(
     name: &str,
     type_hint: &str,
     size_hint: &str,
+    analysis_status: &str,
     now: i64,
     dest: &Path,
 ) -> StoreResult<()> {
@@ -114,7 +116,7 @@ fn persist_material_record(
             r#"
 INSERT INTO materials (
   id, thread_id, name, type_hint, size_hint, analysis_status, added_at_ms, blob_path
-) VALUES (?1, ?2, ?3, ?4, ?5, 'queued', ?6, ?7)
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
 "#,
             params![
                 material_id,
@@ -122,6 +124,7 @@ INSERT INTO materials (
                 name,
                 type_hint,
                 size_hint,
+                analysis_status,
                 now,
                 dest.display().to_string()
             ],

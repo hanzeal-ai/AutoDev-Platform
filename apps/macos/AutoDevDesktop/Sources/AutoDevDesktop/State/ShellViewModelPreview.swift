@@ -29,7 +29,7 @@ private struct PreviewDaemonClient: DaemonQuerying {
         throw DaemonClientError.malformedResponse
     }
 
-    func getProjectStageDetail(projectID _: String, stage _: String?) async throws -> DaemonProjectStageDetail {
+    func getProjectStageDetail(projectID _: String, stage _: String?, subStep _: String?) async throws -> DaemonProjectStageDetail {
         throw DaemonClientError.malformedResponse
     }
 
@@ -61,9 +61,11 @@ private struct PreviewDaemonClient: DaemonQuerying {
         throw DaemonClientError.malformedResponse
     }
 
-    func generateProjectStageAI(projectID _: String, stage _: String?) async throws -> DaemonCommandResult {
+    func generateProjectStageAI(projectID _: String, stage _: String?, feedback _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
+
+    func deleteProject(projectID _: String) async throws {}
 }
 
 extension ShellViewModel {

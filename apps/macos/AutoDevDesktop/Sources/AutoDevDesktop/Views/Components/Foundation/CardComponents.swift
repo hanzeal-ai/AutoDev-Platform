@@ -23,7 +23,7 @@ struct DashboardCard<Content: View>: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         )
     }
 }
@@ -43,6 +43,9 @@ struct MeterBar: View {
             }
         }
         .frame(height: 8)
+        .accessibilityElement()
+        .accessibilityLabel("进度")
+        .accessibilityValue("\(Int(min(max(value, 0), 1) * 100))%")
     }
 }
 
@@ -89,5 +92,7 @@ struct LifecycleTrack: View {
                 }
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel("生命周期进度：当前 \(current.rawValue)")
     }
 }
