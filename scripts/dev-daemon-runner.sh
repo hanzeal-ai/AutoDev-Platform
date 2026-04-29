@@ -8,6 +8,17 @@ LOG_BASE="autodev-daemon"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/opt/rust/bin:/usr/local/bin:$HOME/.cargo/bin:$PATH"
 
+# ── Timezone guard ───────────────────────────────────────────────────────────
+# Force TZ from /etc/localtime so chrono::Local shows real local time even
+# when a proxy or parent shell has injected TZ=UTC into the environment.
+_autodev_tz="$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')"
+if [[ -n "$_autodev_tz" ]]; then
+    export TZ="$_autodev_tz"
+else
+    unset TZ 2>/dev/null || true
+fi
+unset _autodev_tz
+
 timestamp() {
   date '+%Y-%m-%d %H:%M:%S %z'
 }

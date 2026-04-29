@@ -54,6 +54,19 @@ load_env_file "$ROOT_DIR/.env"
 load_env_file "$ROOT_DIR/.env.local"
 load_env_file "$HOME/.config/autodev/deepseek.env"
 
+# ── Timezone guard ───────────────────────────────────────────────────────────
+# Read the real system timezone directly from /etc/localtime and force-export
+# TZ so that chrono::Local (Rust) and time.localtime (Python) both show the
+# correct local time even when a proxy or parent shell has injected TZ=UTC.
+_autodev_tz="$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')"
+if [[ -n "$_autodev_tz" ]]; then
+    export TZ="$_autodev_tz"
+else
+    # Fallback: unset so libc reads /etc/localtime directly
+    unset TZ 2>/dev/null || true
+fi
+unset _autodev_tz
+
 if pgrep -x autodev-daemon >/dev/null 2>&1; then
   pkill -x autodev-daemon >/dev/null 2>&1 || true
   for _ in {1..30}; do

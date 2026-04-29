@@ -16,6 +16,18 @@ for envfile in "$PROJECT_ROOT/.env" "$PROJECT_ROOT/.env.local" "$HOME/.config/au
   fi
 done
 
+# ── Timezone guard ───────────────────────────────────────────────────────────
+# Read the real system timezone from /etc/localtime and force-export TZ so
+# that Python's time.localtime() shows the correct local time even when a
+# proxy or parent shell has injected TZ=UTC into the environment.
+_autodev_tz="$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')"
+if [[ -n "$_autodev_tz" ]]; then
+    export TZ="$_autodev_tz"
+else
+    unset TZ 2>/dev/null || true
+fi
+unset _autodev_tz
+
 # Check Python
 if ! command -v python3 &>/dev/null; then
   echo "Error: python3 not found"

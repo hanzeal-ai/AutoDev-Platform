@@ -9,3 +9,5 @@ target/
 DerivedData/
 .swiftpm/
 logs/**/*.log
+__pycache__/
+*.pyc
