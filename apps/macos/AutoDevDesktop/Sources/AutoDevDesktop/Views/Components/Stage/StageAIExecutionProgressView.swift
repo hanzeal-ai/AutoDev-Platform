@@ -14,67 +14,25 @@ struct StageAIExecutionProgressView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AutoDevViewTheme.compactSpacing) {
-            Text("后台 AI 会话")
-                .font(.subheadline.weight(.semibold))
-
-            VStack(alignment: .leading, spacing: 0) {
-                executionStatusBar
-
-                Divider()
-
-                transcriptContent
-
-                Divider()
-
-                VStack(spacing: 0) {
-                    if isShowingFeedback {
-                        feedbackPanel
-                        Divider()
-                    }
-                    actionBar
-                }
-            }
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+        VStack(alignment: .leading, spacing: 0) {
+            AgentStatusHeader(
+                state: helper.executionState,
+                latestTime: helper.latestActivity?.time
             )
-        }
-    }
 
-    // MARK: - Status Bar
+            Divider()
 
-    private var executionStatusBar: some View {
-        HStack(spacing: 8) {
-            if helper.executionState.showsSpinner {
-                ProgressView()
-                    .controlSize(.small)
-                    .scaleEffect(0.7)
-            } else {
-                Image(systemName: helper.executionState.icon)
-                    .foregroundColor(helper.executionState.tint)
-                    .font(.caption)
-            }
-            Text(helper.executionState.label)
-                .font(.caption.weight(.semibold))
-                .foregroundColor(helper.executionState.tint)
-            Text(helper.latestActivity?.title ?? helper.statusLine)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-            Spacer()
-            if let latestActivity = helper.latestActivity {
-                Text(latestActivity.time)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
+            transcriptContent
+
+            Divider()
+
+            actionArea
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("AI 执行状态：\(helper.executionState.label)")
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+        )
     }
 
     // MARK: - Transcript
@@ -83,34 +41,29 @@ struct StageAIExecutionProgressView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    if helper.thinkingEvents.isEmpty && helper.writingStatusMessage == nil && helper.artifactItems.isEmpty {
-                        AITranscriptBubble(
-                            message: AITranscriptMessage(
-                                kind: .system,
-                                title: "等待后台触发",
-                                body: "进入阶段后会自动触发后台 AI。若没有启动或上次失败，可以手动重试。",
-                                footnote: "系统"
-                            )
-                        )
+                    // Empty state
+                    if helper.thinkingEvents.isEmpty && helper.conversationMessages.isEmpty {
+                        emptyStateMessage
                     } else {
+                        // Thinking block
                         if !helper.thinkingEvents.isEmpty {
-                            AIThinkingDisclosure(
+                            AgentThinkingBlock(
+                                title: helper.thinkingSectionTitle,
                                 events: helper.thinkingEvents,
                                 state: helper.executionState,
+                                durationSeconds: helper.thinkingDurationSeconds,
                                 isExpanded: $thinkingExpanded
                             )
                         }
 
-                        ForEach(helper.visibleMessages) { message in
-                            AITranscriptBubble(message: message)
+                        // Conversation messages
+                        ForEach(helper.conversationMessages) { message in
+                            AgentMessageBubble(viewModel: viewModel, message: message)
                         }
 
-                        if let statusMessage = helper.writingStatusMessage {
-                            AITranscriptBubble(message: statusMessage)
-                        }
-
-                        if !helper.artifactItems.isEmpty {
-                            AIArtifactBlock(viewModel: viewModel, items: helper.artifactItems)
+                        // Task checklist
+                        if !helper.taskItems.isEmpty {
+                            AgentTaskChecklist(title: helper.taskSectionTitle, steps: helper.taskItems)
                         }
                     }
 
@@ -120,7 +73,7 @@ struct StageAIExecutionProgressView: View {
                 }
                 .padding(14)
             }
-            .frame(height: 280)
+            .frame(height: 300)
             .onAppear {
                 proxy.scrollTo("conversation-bottom", anchor: .bottom)
             }
@@ -132,82 +85,68 @@ struct StageAIExecutionProgressView: View {
         }
     }
 
-    // MARK: - Feedback Panel
-
-    private var feedbackPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("调整意见")
-                .font(.caption.weight(.semibold))
+    private var emptyStateMessage: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bolt.horizontal")
+                .font(.caption)
                 .foregroundColor(.secondary)
-            TextEditor(text: $feedbackDraft)
-                .font(.callout)
-                .frame(height: 60)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                )
-                .overlay(alignment: .topLeading) {
-                    if feedbackDraft.isEmpty {
-                        Text("描述你希望调整的内容，例如「风险分析不够详细」「增加测试覆盖率要求」…")
-                            .font(.callout)
-                            .foregroundColor(.secondary.opacity(0.5))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 8)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .accessibilityLabel("调整意见输入")
-            HStack(spacing: 8) {
-                Spacer()
-                Button("取消") {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isShowingFeedback = false
-                        feedbackDraft = ""
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                Button("根据反馈重新生成") {
-                    let feedback = feedbackDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isShowingFeedback = false
-                        feedbackDraft = ""
-                    }
-                    viewModel.generateAIForSelectedStage(feedback: feedback.isEmpty ? nil : feedback)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(feedbackDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isGeneratingStageAI)
-            }
+            Text("进入阶段后将自动触发后台 AI。若未启动或上次失败，可手动触发。")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 
-    // MARK: - Action Bar
+    // MARK: - Action Area
+
+    private var actionArea: some View {
+        VStack(spacing: 0) {
+            if isShowingFeedback {
+                AgentFeedbackInput(
+                    feedbackDraft: $feedbackDraft,
+                    isGenerating: viewModel.isGeneratingStageAI,
+                    onCancel: {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            isShowingFeedback = false
+                            feedbackDraft = ""
+                        }
+                    },
+                    onSubmit: { feedback in
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            isShowingFeedback = false
+                            feedbackDraft = ""
+                        }
+                        viewModel.clearSelectedStageUI()
+                        viewModel.generateAIForSelectedStage(feedback: feedback.isEmpty ? nil : feedback)
+                    }
+                )
+                Divider()
+            }
+            actionBar
+        }
+    }
 
     private var actionBar: some View {
         HStack(spacing: 10) {
-            Text("后台自动触发，无需输入。")
-                .font(.caption)
-                .foregroundColor(.secondary)
             Spacer()
             if helper.executionState == .completed {
-                Button("不满意，调整") {
+                Button {
                     withAnimation(.easeOut(duration: 0.15)) {
                         isShowingFeedback = true
                     }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("不满意？调整并重新生成")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(viewModel.isGeneratingStageAI)
-
-                Button("重新生成") {
-                    viewModel.generateAIForSelectedStage()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .handCursorOnHover()
                 .disabled(viewModel.isGeneratingStageAI)
             } else if helper.executionState == .waiting || helper.executionState == .failed {
                 Button(helper.executionState == .failed ? "重试后台 AI" : "触发后台 AI") {
@@ -216,6 +155,10 @@ struct StageAIExecutionProgressView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .disabled(viewModel.isGeneratingStageAI)
+            } else {
+                Text("后台 AI 执行中…")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.horizontal, 12)

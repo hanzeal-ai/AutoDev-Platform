@@ -61,7 +61,7 @@ extension ShellViewModel {
         case .liveDaemon:
             guard !isSendingCreationMessage else { return }
             isSendingCreationMessage = true
-            Task { [weak self] in
+            creationStreamTask = Task { [weak self] in
                 guard let self else { return }
                 do {
                     try await sendCreationInputToDaemon(
@@ -70,16 +70,24 @@ extension ShellViewModel {
                         allowRetry: true
                     )
                 } catch {
-                    if let selectedThreadID = state.selectedEffectiveCreationThreadID {
-                        let errorMessage = localCreationMessage(
-                            role: .ai,
-                            content: "系统提示：发送失败（\(error.localizedDescription)）。请稍后重试。"
-                        )
-                        appendTransientCreationMessage(errorMessage, threadID: selectedThreadID)
+                    if !Task.isCancelled {
+                        if let selectedThreadID = state.selectedEffectiveCreationThreadID {
+                            let errorMessage = localCreationMessage(
+                                role: .ai,
+                                content: "系统提示：发送失败（\(error.localizedDescription)）。请稍后重试。"
+                            )
+                            appendTransientCreationMessage(errorMessage, threadID: selectedThreadID)
+                        }
+                        state.apply(operationError: error, context: "发送消息")
                     }
-                    state.apply(operationError: error, context: "发送消息")
                 }
-                isSendingCreationMessage = false
+                // Only clean up if this task wasn't cancelled
+                // (cancelled tasks are cleaned up by cancelCreationMessage)
+                if !Task.isCancelled {
+                    isSendingCreationMessage = false
+                    creationStreamTask = nil
+                    creationStreamHandle = nil
+                }
             }
         }
     }
@@ -91,29 +99,110 @@ extension ShellViewModel {
     ) async throws {
         let transientUserMessage = localCreationMessage(role: .user, content: rawInput)
         appendTransientCreationMessage(transientUserMessage, threadID: threadID)
-        let transientLoadingMessage = localLoadingCreationMessage(threadID: threadID)
-        appendTransientCreationMessage(transientLoadingMessage, threadID: threadID)
 
-        defer {
-            removeTransientCreationMessages(threadID: threadID, messageIDs: [
-                transientUserMessage.id,
-                transientLoadingMessage.id
-            ])
-        }
+        // Create an empty AI message that will accumulate streaming deltas
+        let streamingAIMessage = CreationConversationMessage(
+            id: UUID(),
+            role: .ai,
+            content: "",
+            timestamp: "刚刚",
+            isLoading: true
+        )
+        appendTransientCreationMessage(streamingAIMessage, threadID: threadID)
 
+        var accumulatedContent = ""
+        var shouldPreserveStreamingMessage = false
         do {
-            let result = try await daemonClient.addCreationMessage(
+            let streamingHandle = daemonClient.addCreationMessageStreaming(
                 threadID: threadID.uuidString,
                 content: rawInput
             )
-            applyCreationMessageResult(
-                threadID: threadID,
-                assistantMessage: result.assistantMessage,
-                reportDraft: result.reportDraft
-            )
-            try await refreshCreationThreads()
-            state.selectCreationThread(threadID)
+            creationStreamHandle = streamingHandle
+
+            for await event in streamingHandle.stream {
+                // Check cooperative cancellation on each iteration
+                if Task.isCancelled { break }
+
+                switch event {
+                case .delta(let delta):
+                    accumulatedContent += delta
+                    updateTransientCreationMessage(
+                        threadID: threadID,
+                        messageID: streamingAIMessage.id,
+                        content: accumulatedContent,
+                        isLoading: true
+                    )
+
+                case .done(let result):
+                    // Clear ALL transient messages (includes leftover from cancelled sends)
+                    clearTransientCreationMessages(threadID: threadID)
+                    applyCreationMessageResult(
+                        threadID: threadID,
+                        assistantMessage: result.assistantMessage,
+                        reportDraft: result.reportDraft
+                    )
+                    try await refreshCreationThreads()
+                    state.selectCreationThread(threadID)
+                    return
+
+                case .error(let errorMsg):
+                    // Update the streaming message to show the error
+                    shouldPreserveStreamingMessage = true
+                    updateTransientCreationMessage(
+                        threadID: threadID,
+                        messageID: streamingAIMessage.id,
+                        content: "系统提示：\(errorMsg)",
+                        isLoading: false
+                    )
+                    removeTransientCreationMessages(threadID: threadID, messageIDs: [transientUserMessage.id])
+                    throw DaemonClientError.daemonError(code: "stream_error", detail: errorMsg)
+                }
+            }
+
+            // Stream ended — either naturally or by cancellation
+            if Task.isCancelled {
+                // Cancelled: keep accumulated content visible as a stopped message
+                if !accumulatedContent.isEmpty {
+                    updateTransientCreationMessage(
+                        threadID: threadID,
+                        messageID: streamingAIMessage.id,
+                        content: accumulatedContent,
+                        isLoading: false
+                    )
+                }
+                return
+            }
+
+            // Stream ended without done event — treat accumulated content as final
+            if !accumulatedContent.isEmpty {
+                clearTransientCreationMessages(threadID: threadID)
+                applyCreationMessageResult(
+                    threadID: threadID,
+                    assistantMessage: accumulatedContent,
+                    reportDraft: nil
+                )
+                try await refreshCreationThreads()
+                state.selectCreationThread(threadID)
+            }
         } catch {
+            // Clean up transient messages on failure
+            if !shouldPreserveStreamingMessage && accumulatedContent.isEmpty {
+                removeTransientCreationMessages(threadID: threadID, messageIDs: [
+                    transientUserMessage.id,
+                    streamingAIMessage.id
+                ])
+            } else {
+                removeTransientCreationMessages(threadID: threadID, messageIDs: [transientUserMessage.id])
+                if !shouldPreserveStreamingMessage {
+                    updateTransientCreationMessage(
+                        threadID: threadID,
+                        messageID: streamingAIMessage.id,
+                        content: accumulatedContent,
+                        isLoading: false
+                    )
+                }
+            }
+
             if allowRetry, isStaleCreationThreadError(error) {
                 StructuredLogWriter.write(
                     component: "autodev-app",
@@ -160,5 +249,46 @@ extension ShellViewModel {
             timestamp: "刚刚",
             isLoading: true
         )
+    }
+
+    // MARK: - Retry & Cancel
+
+    func retryLastCreationMessage(threadID: UUID) {
+        // Find the last user message for this thread
+        guard let thread = state.creationThreads.first(where: { $0.id == threadID }) else { return }
+        guard let lastUserMessage = thread.messages.last(where: { $0.role == .user }) else { return }
+        sendCreationInput(threadID: threadID, lastUserMessage.content)
+    }
+
+    func cancelCreationMessage() {
+        guard isSendingCreationMessage else { return }
+
+        // 1. Cancel the socket — stops the background I/O thread immediately
+        creationStreamHandle?.cancel()
+        creationStreamHandle = nil
+
+        // 2. Cancel the Task — sets cooperative cancellation flag
+        creationStreamTask?.cancel()
+        creationStreamTask = nil
+
+        isSendingCreationMessage = false
+
+        // Keep accumulated streaming content visible, remove loading indicators
+        if let threadID = state.selectedEffectiveCreationThreadID {
+            if let messages = transientCreationMessagesByThread[threadID] {
+                for message in messages where message.isLoading {
+                    if message.content.isEmpty {
+                        removeTransientCreationMessage(messageID: message.id, threadID: threadID)
+                    } else {
+                        updateTransientCreationMessage(
+                            threadID: threadID,
+                            messageID: message.id,
+                            content: message.content,
+                            isLoading: false
+                        )
+                    }
+                }
+            }
+        }
     }
 }

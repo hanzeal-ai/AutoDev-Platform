@@ -1,7 +1,7 @@
+use crate::logger;
 use crate::protocol;
 use crate::router;
 use crate::runtime::RuntimePaths;
-use crate::logger;
 use std::error::Error;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -79,14 +79,19 @@ fn handle_client(
             }
         };
 
-        let out = router::route_request(inbound, runtime_paths.as_ref());
-        write_envelope(&mut writer, &out)?;
+        // Check if this is a streaming command
+        if router::is_streaming_command(&inbound) {
+            router::route_streaming_request(inbound, runtime_paths.as_ref(), &mut writer);
+        } else {
+            let out = router::route_request(inbound, runtime_paths.as_ref());
+            write_envelope(&mut writer, &out)?;
+        }
     }
 
     Ok(())
 }
 
-fn write_envelope(
+pub(crate) fn write_envelope(
     writer: &mut UnixStream,
     envelope: &protocol::EnvelopeOut,
 ) -> Result<(), Box<dyn Error>> {

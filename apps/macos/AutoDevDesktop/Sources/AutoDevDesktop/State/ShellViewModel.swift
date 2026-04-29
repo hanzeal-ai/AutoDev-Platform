@@ -9,6 +9,8 @@ final class ShellViewModel: ObservableObject {
     @Published var isGeneratingStageAI: Bool = false
     @Published var isSendingCreationMessage: Bool = false
     @Published private(set) var transientCreationMessagesByThread: [UUID: [CreationConversationMessage]] = [:]
+    var creationStreamTask: Task<Void, Never>?
+    var creationStreamHandle: CreationStreamingHandle?
 
     let daemonClient: DaemonQuerying
     let dataMode: ShellDataMode
@@ -65,6 +67,10 @@ final class ShellViewModel: ObservableObject {
         }
     }
 
+    func clearTransientCreationMessages(threadID: UUID) {
+        transientCreationMessagesByThread.removeValue(forKey: threadID)
+    }
+
     func removeTransientCreationMessage(messageID: UUID, threadID: UUID) {
         guard var messages = transientCreationMessagesByThread[threadID] else {
             return
@@ -75,5 +81,24 @@ final class ShellViewModel: ObservableObject {
         } else {
             transientCreationMessagesByThread[threadID] = messages
         }
+    }
+
+    func updateTransientCreationMessage(
+        threadID: UUID,
+        messageID: UUID,
+        content: String,
+        isLoading: Bool
+    ) {
+        guard var messages = transientCreationMessagesByThread[threadID] else { return }
+        guard let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        let existing = messages[index]
+        messages[index] = CreationConversationMessage(
+            id: existing.id,
+            role: existing.role,
+            content: content,
+            timestamp: existing.timestamp,
+            isLoading: isLoading
+        )
+        transientCreationMessagesByThread[threadID] = messages
     }
 }

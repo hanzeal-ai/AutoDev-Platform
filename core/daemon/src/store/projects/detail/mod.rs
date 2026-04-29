@@ -132,6 +132,7 @@ impl Store {
         };
 
         let feasibility = self.project_feasibility_context(&project_id)?;
+        let ai_run = query::latest_ai_run(self, &project_id, &active_stage)?;
 
         // Determine the effective data key for stages with sub-steps
         let lifecycle = crate::store::lifecycle::LifecycleStage::from_str(&active_stage);
@@ -143,20 +144,67 @@ impl Store {
                 // Client explicitly selected a sub-step — use it
                 (format!("{}:{}", active_stage, ss), Some(ss.to_string()))
             } else {
-                // Auto-detect: find the LAST sub-step that has data (most recent progress)
-                let mut detected: Option<&str> = None;
-                for (key, _) in sub_steps_def.iter() {
-                    let compound = format!("{}:{}", active_stage, key);
-                    if query::load_stage(self, &project_id, &compound)?.is_some() {
-                        detected = Some(key);
+                let base_has_content =
+                    query::load_stage(self, &project_id, &active_stage)?.is_some();
+                let detected: Option<&str> = if active_stage == "ui" {
+                    let page_map_has_content = self.sub_step_has_content(
+                        &project_id,
+                        &active_stage,
+                        "page_map",
+                        0,
+                        base_has_content,
+                    )?;
+                    let interaction_has_content = self.sub_step_has_content(
+                        &project_id,
+                        &active_stage,
+                        "interaction",
+                        1,
+                        base_has_content,
+                    )?;
+                    let ai_run_active = ai_run
+                        .as_ref()
+                        .and_then(|value| value.get("status").and_then(Value::as_str))
+                        .map(|status| {
+                            matches!(
+                                status,
+                                "dispatched"
+                                    | "waiting_first_delta"
+                                    | "streaming"
+                                    | "post_processing"
+                            )
+                        })
+                        .unwrap_or(false);
+
+                    if interaction_has_content {
+                        Some("interaction")
+                    } else if page_map_has_content {
+                        if ai_run_active {
+                            // AI is actively generating interaction content — show it early
+                            Some("interaction")
+                        } else {
+                            // page_map done, interaction not yet started — stay on page_map
+                            Some("page_map")
+                        }
+                    } else if ai_run_active || base_has_content {
+                        Some("page_map")
+                    } else {
+                        sub_steps_def.first().map(|(k, _)| *k)
                     }
-                }
-                // If no compound key data, check base key → first sub-step
-                if detected.is_none() {
-                    if query::load_stage(self, &project_id, &active_stage)?.is_some() {
+                } else {
+                    // Generic auto-detect: find the LAST sub-step that has data (most recent progress)
+                    let mut detected: Option<&str> = None;
+                    for (key, _) in sub_steps_def.iter() {
+                        let compound = format!("{}:{}", active_stage, key);
+                        if query::load_stage(self, &project_id, &compound)?.is_some() {
+                            detected = Some(key);
+                        }
+                    }
+                    if detected.is_none() && base_has_content {
                         detected = sub_steps_def.first().map(|(k, _)| *k);
                     }
-                }
+                    detected
+                };
+
                 let ss = detected
                     .or_else(|| sub_steps_def.first().map(|(k, _)| *k))
                     .unwrap_or("");
@@ -202,8 +250,6 @@ impl Store {
         let stage_content = assemble::merge_stage_content(stage_row.as_ref(), &defaults);
         let artifacts = query::list_stage_artifacts(self, &project_id, &effective_data_key)?;
         let events = query::list_stage_events(self, &project_id, &effective_data_key)?;
-        let ai_run = query::latest_ai_run(self, &project_id, &active_stage)?;
-
         let updated_at_ms = if project.updated_at_ms > 0 {
             project.updated_at_ms
         } else {
@@ -260,20 +306,21 @@ impl Store {
                 .flatten()
                 .is_some();
 
-            let items: Vec<Value> = sub_steps_def.iter().enumerate().map(|(i, (key, label))| {
-                let ss_key = format!("{}:{}", active_stage, key);
-                let has_content = query::load_stage(self, &project_id, &ss_key)
-                    .ok()
-                    .flatten()
-                    .is_some()
-                    // Fallback: first sub-step inherits base key data for backward compat
-                    || (i == 0 && base_has_content);
-                json!({
+            let mut items: Vec<Value> = Vec::new();
+            for (i, (key, label)) in sub_steps_def.iter().enumerate() {
+                let has_content = self.sub_step_has_content(
+                    &project_id,
+                    &active_stage,
+                    key,
+                    i,
+                    base_has_content,
+                )?;
+                items.push(json!({
                     "key": key,
                     "label": label,
                     "has_content": has_content
-                })
-            }).collect();
+                }));
+            }
             json!(items)
         } else {
             json!(null)
@@ -302,5 +349,32 @@ impl Store {
         } else {
             Ok(None)
         }
+    }
+
+    fn sub_step_has_content(
+        &self,
+        project_id: &str,
+        active_stage: &str,
+        sub_step_key: &str,
+        index: usize,
+        base_has_content: bool,
+    ) -> StoreResult<bool> {
+        let ss_key = format!("{}:{}", active_stage, sub_step_key);
+        let stage_exists = query::load_stage(self, project_id, &ss_key)?.is_some()
+            || (index == 0 && base_has_content);
+
+        if !stage_exists {
+            return Ok(false);
+        }
+
+        if active_stage == "ui" && sub_step_key == "interaction" {
+            let artifacts = query::list_stage_artifacts(self, project_id, &ss_key)?;
+            let has_deliverable = artifacts.iter().any(|artifact| {
+                artifact.get("kind").and_then(Value::as_str) == Some("interaction-snapshot")
+            });
+            return Ok(has_deliverable);
+        }
+
+        Ok(true)
     }
 }

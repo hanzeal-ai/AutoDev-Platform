@@ -35,4 +35,9 @@ pub const MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI_OK: &str =
 pub const MESSAGE_COMMAND_DELETE_PROJECT: &str = "command.delete_project";
 pub const MESSAGE_COMMAND_DELETE_PROJECT_OK: &str = "command.delete_project.ok";
 
+pub const MESSAGE_COMMAND_ADD_CREATION_MESSAGE_STREAM: &str = "command.add_creation_message_stream";
+pub const MESSAGE_EVENT_CREATION_MESSAGE_DELTA: &str = "event.creation_message.delta";
+pub const MESSAGE_EVENT_CREATION_MESSAGE_DONE: &str = "event.creation_message.done";
+pub const MESSAGE_EVENT_CREATION_MESSAGE_ERROR: &str = "event.creation_message.error";
+
 pub const MESSAGE_ERROR: &str = "error";

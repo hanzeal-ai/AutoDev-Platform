@@ -8,7 +8,7 @@ struct ProjectDetailPage: View {
             if let project = viewModel.state.selectedProject {
                 let detail = viewModel.state.selectedExecutionDetail
                 let subSteps = detail?.subSteps ?? []
-                let activeSubStep = detail?.activeSubStep ?? subSteps.first?.key ?? ""
+                let activeSubStep = resolvedActiveSubStep(detail: detail, subSteps: subSteps) ?? ""
 
                 VStack(spacing: AutoDevViewTheme.pageSpacing) {
                     // Decision bar
@@ -30,7 +30,13 @@ struct ProjectDetailPage: View {
                                 StageSubStepTrack(
                                     subSteps: subSteps,
                                     activeSubStep: activeSubStep,
-                                    onSelect: { viewModel.selectSubStep($0) }
+                                    onSelect: { viewModel.selectSubStep($0) },
+                                    isStepDisabled: { step in
+                                        isSubStepDisabled(step, detail: detail)
+                                    },
+                                    onDisabledSelect: { _ in
+                                        viewModel.showStatusMessage("请先完成页面地图")
+                                    }
                                 )
                             }
                         }
@@ -65,13 +71,56 @@ struct ProjectDetailPage: View {
 
     private var stageWorkspaceTitle: String {
         let stage = viewModel.state.activeDetailStage
-        let subStep = viewModel.state.selectedSubStep
         let detail = viewModel.state.selectedExecutionDetail
+        let subSteps = detail?.subSteps ?? []
+        let subStep = resolvedActiveSubStep(detail: detail, subSteps: subSteps)
         if let subStep,
-           let match = detail?.subSteps.first(where: { $0.key == subStep }) {
+           let match = subSteps.first(where: { $0.key == subStep }) {
             return "\(stage.rawValue) · \(match.label)"
         }
         return stage.rawValue
+    }
+
+    func resolvedActiveSubStep(
+        detail: DeliveryExecutionDetail?,
+        subSteps: [DeliverySubStepItem]
+    ) -> String? {
+        let stage = viewModel.state.activeDetailStage
+        let selected = viewModel.state.selectedSubStep
+
+        guard stage == .ui else {
+            return selected ?? detail?.activeSubStep ?? subSteps.first?.key
+        }
+
+        let pageMapDone = subSteps.first(where: { $0.key == "page_map" })?.hasContent == true
+        let interactionDone = subSteps.first(where: { $0.key == "interaction" })?.hasContent == true
+
+        if !pageMapDone {
+            return "page_map"
+        }
+
+        if !interactionDone {
+            return "interaction"
+        }
+
+        if let selected,
+           let selectedStep = subSteps.first(where: { $0.key == selected }),
+           !isSubStepDisabled(selectedStep, detail: detail) {
+            return selected
+        }
+
+        return detail?.activeSubStep ?? "interaction"
+    }
+
+    func isSubStepDisabled(_ step: DeliverySubStepItem, detail: DeliveryExecutionDetail?) -> Bool {
+        guard viewModel.state.activeDetailStage == .ui else {
+            return false
+        }
+        guard step.key == "interaction" else {
+            return false
+        }
+        let pageMapDone = detail?.subSteps.first(where: { $0.key == "page_map" })?.hasContent == true
+        return !pageMapDone
     }
 }
 

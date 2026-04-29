@@ -44,6 +44,10 @@ extension ShellViewModel {
         scheduleSelectedProjectDetailRefresh()
     }
 
+    func showStatusMessage(_ message: String) {
+        state.statusMessage = message
+    }
+
     func triggerStageAction(_ action: String) {
         if shouldPlanDevelopment(for: action) {
             planDevelopmentForSelectedProject()

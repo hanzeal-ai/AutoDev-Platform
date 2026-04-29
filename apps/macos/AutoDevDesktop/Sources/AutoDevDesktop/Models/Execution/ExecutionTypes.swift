@@ -46,6 +46,9 @@ struct DeliveryStageAIRun: Equatable {
     var status: String
     var startedAt: String
     var updatedAt: String
+    var startedAtMs: Int64
+    var updatedAtMs: Int64
+    var firstDeltaAtMs: Int64?
     var deltaCount: Int
     var errorMessage: String?
 

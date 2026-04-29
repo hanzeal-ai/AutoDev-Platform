@@ -74,6 +74,9 @@ extension DomainMapper {
             status: dto.status,
             startedAt: dto.startedAt,
             updatedAt: dto.updatedAt,
+            startedAtMs: dto.startedAtMs,
+            updatedAtMs: dto.updatedAtMs,
+            firstDeltaAtMs: dto.firstDeltaAtMs,
             deltaCount: dto.deltaCount,
             errorMessage: dto.errorMessage
         )

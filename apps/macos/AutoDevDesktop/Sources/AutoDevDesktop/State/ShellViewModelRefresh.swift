@@ -62,6 +62,12 @@ extension ShellViewModel {
         }
     }
 
+    /// Clears the cached stage detail so the UI resets before regeneration.
+    func clearSelectedStageUI() {
+        guard let key = state.selectedExecutionDetailKey else { return }
+        state.executionDetails[key] = nil
+    }
+
     func generateAIForSelectedStage(feedback: String? = nil) {
         guard dataMode == .liveDaemon else {
             state.statusMessage = "预览模式不能触发后台 AI"

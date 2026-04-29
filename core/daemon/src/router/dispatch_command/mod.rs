@@ -10,6 +10,7 @@ mod plan_development;
 use crate::protocol;
 use crate::runtime;
 use serde_json::Value;
+use std::os::unix::net::UnixStream;
 
 pub(super) fn dispatch(
     inbound: &protocol::EnvelopeIn,
@@ -51,4 +52,20 @@ pub(super) fn dispatch(
         }
         _ => None,
     }
+}
+
+pub(super) fn dispatch_streaming_add_message(
+    inbound: &protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+    writer: &mut UnixStream,
+    correlation_id: &str,
+    schema_version: u32,
+) {
+    creation_messages::handle_add_message_streaming(
+        inbound,
+        runtime_paths,
+        writer,
+        correlation_id,
+        schema_version,
+    );
 }

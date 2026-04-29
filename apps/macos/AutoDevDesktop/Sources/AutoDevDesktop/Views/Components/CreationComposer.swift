@@ -6,7 +6,9 @@ struct CreationComposer: View {
     let isSending: Bool
     @Binding var draft: String
     @Binding var insertionRequest: CreationInputInsertionRequest?
+    var stage: DeliveryLifecycleStage = .feasibility
     let onSend: (UUID, String) -> Void
+    var onStop: (() -> Void)? = nil
 
     private let minEditorHeight: CGFloat = 108
     private let maxEditorHeight: CGFloat = 188
@@ -19,12 +21,13 @@ struct CreationComposer: View {
             CreationComposerTextView(
                 text: $draft,
                 insertionRequest: $insertionRequest,
-                isEditable: threadID != nil && !isSending
+                isEditable: threadID != nil && !isSending,
+                onSubmit: submit
             )
             .frame(minHeight: minEditorHeight, maxHeight: maxEditorHeight)
 
             if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("直接说你的目标、想法或约束，我会边聊边帮你收敛需求…")
+                Text(placeholderText)
                     .foregroundColor(.secondary)
                     .padding(.leading, 15)
                     .padding(.top, 12)
@@ -34,32 +37,53 @@ struct CreationComposer: View {
                     .allowsHitTesting(false)
             }
 
-            Button(action: submit) {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.9))
-                    if isSending {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 13, weight: .semibold))
+            if isSending, let onStop {
+                // Stop generating button
+                Button(action: onStop) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("停止生成")
+                            .font(.system(size: 11, weight: .medium))
                     }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.7))
+                    )
                 }
-                .frame(width: 42, height: 42)
-                .contentShape(Circle())
+                .buttonStyle(.plain)
+                .padding(.trailing, 12)
+                .padding(.bottom, 12)
+            } else {
+                Button(action: submit) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.9))
+                        if isSending {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                    }
+                    .frame(width: 42, height: 42)
+                    .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white)
+                .padding(.trailing, 12)
+                .padding(.bottom, 12)
+                .disabled(
+                    draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        threadID == nil ||
+                        isSending
+                )
             }
-            .buttonStyle(.plain)
-            .foregroundColor(.white)
-            .padding(.trailing, 12)
-            .padding(.bottom, 12)
-            .disabled(
-                draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                    threadID == nil ||
-                    isSending
-            )
-            .keyboardShortcut(.return, modifiers: [.command])
         }
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -79,15 +103,31 @@ struct CreationComposer: View {
         draft = ""
         onSend(threadID, pending)
     }
+
+    private var placeholderText: String {
+        switch stage {
+        case .feasibility:
+            return "直接说你的目标、想法或约束，我会边聊边帮你收敛需求…"
+        case .prd:
+            return "补充功能细节或调整优先级…"
+        case .ui:
+            return "描述界面想法或交互细节…"
+        case .development:
+            return "讨论技术方案或实现细节…"
+        default:
+            return "输入你的想法…"
+        }
+    }
 }
 
 struct CreationComposerTextView: NSViewRepresentable {
     @Binding var text: String
     @Binding var insertionRequest: CreationInputInsertionRequest?
     let isEditable: Bool
+    var onSubmit: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, insertionRequest: $insertionRequest)
+        Coordinator(text: $text, insertionRequest: $insertionRequest, onSubmit: onSubmit)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -122,6 +162,10 @@ struct CreationComposerTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.text = $text
+        context.coordinator.insertionRequest = $insertionRequest
+        context.coordinator.onSubmit = onSubmit
+
         guard let textView = context.coordinator.textView else { return }
 
         textView.isEditable = isEditable
@@ -144,18 +188,38 @@ struct CreationComposerTextView: NSViewRepresentable {
         var insertionRequest: Binding<CreationInputInsertionRequest?>
         weak var textView: NSTextView?
         var lastHandledInsertionID: UUID?
+        var onSubmit: (() -> Void)?
 
         init(
             text: Binding<String>,
-            insertionRequest: Binding<CreationInputInsertionRequest?>
+            insertionRequest: Binding<CreationInputInsertionRequest?>,
+            onSubmit: (() -> Void)? = nil
         ) {
             self.text = text
             self.insertionRequest = insertionRequest
+            self.onSubmit = onSubmit
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
             text.wrappedValue = textView.string
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                // Check if Shift is held
+                let flags = NSApp.currentEvent?.modifierFlags ?? []
+                if flags.contains(.shift) {
+                    // Shift+Enter: insert newline
+                    textView.insertNewlineIgnoringFieldEditor(nil)
+                    return true
+                } else {
+                    // Enter: submit
+                    onSubmit?()
+                    return true
+                }
+            }
+            return false
         }
 
         func handleInsertion(_ request: CreationInputInsertionRequest) {

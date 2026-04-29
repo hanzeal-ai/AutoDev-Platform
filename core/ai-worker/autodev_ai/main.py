@@ -2,22 +2,44 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time as _time
 import traceback
 
 from fastapi import FastAPI, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from .config import ModelConfig, get_worker_port
-from .models import StageContext, ReportContext, ChatContext, StreamDelta, PRDContext, DevelopmentContext, CodingContext
-from .graphs.stage import build_stage_graph, StageState
-from .graphs.prd import build_prd_graph, PRDState
-from .graphs.development import build_development_graph, DevState
-from .graphs.coding import build_coding_graph, CodingState
+from .graphs.chat import generate_chat, generate_chat_stream
+from .graphs.coding import CodingState, build_coding_graph
+from .graphs.development import DevState, build_development_graph
+from .graphs.prd import PRDState, build_prd_graph
 from .graphs.report import generate_report
-from .graphs.chat import generate_chat
+from .graphs.stage import StageState, build_stage_graph
+from .models import (
+    ChatContext,
+    CodingContext,
+    DevelopmentContext,
+    PRDContext,
+    ReportContext,
+    StageContext,
+    StreamDelta,
+)
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+# ── Logging setup ──────────────────────────────────────────────────────────────
+# Explicitly set converter = time.localtime on the Formatter base class so that
+# every handler (including ones Uvicorn installs) uses local time, not UTC.
+# force=True removes any handlers that Uvicorn may have attached to the root
+# logger before this module was imported, then installs a fresh StreamHandler
+# with our format (which includes %z so the timezone offset is always visible).
+logging.Formatter.converter = _time.localtime
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S %z",
+    force=True,
+)
 logger = logging.getLogger("autodev_ai")
 
 app = FastAPI(title="AutoDev AI Worker", version="0.1.0")
@@ -59,12 +81,16 @@ async def _sse_stream_graph(graph, initial_state: dict, agent_node: str, error_l
     if final_result:
         yield {
             "event": "message",
-            "data": StreamDelta(kind="result", structured=final_result.model_dump()).model_dump_json(),
+            "data": StreamDelta(
+                kind="result", structured=final_result.model_dump()
+            ).model_dump_json(),
         }
     else:
         yield {
             "event": "message",
-            "data": StreamDelta(kind="error", content=f"{error_label} 图执行完成但无最终结果").model_dump_json(),
+            "data": StreamDelta(
+                kind="error", content=f"{error_label} 图执行完成但无最终结果"
+            ).model_dump_json(),
         }
 
 
@@ -94,8 +120,12 @@ async def generate_stage(ctx: StageContext):
     async def event_generator():
         try:
             initial_state: StageState = {
-                "context": ctx, "config": cfg, "agent_reply": "",
-                "deltas": [], "structured": {}, "error": None,
+                "context": ctx,
+                "config": cfg,
+                "agent_reply": "",
+                "deltas": [],
+                "structured": {},
+                "error": None,
             }
             async for evt in _sse_stream_graph(_stage_graph, initial_state, "agent", ""):
                 yield evt
@@ -144,6 +174,43 @@ async def generate_chat_clarification(ctx: ChatContext):
         raise HTTPException(status_code=500, detail="对话生成失败，请重试")
 
 
+@app.post("/generate/chat/stream")
+async def generate_chat_stream_endpoint(ctx: ChatContext):
+    """Run a chat clarification turn with SSE streaming.
+
+    Returns an SSE stream with events:
+      - kind=delta  : each streaming text chunk of the assistant reply
+      - kind=result : final structured {assistant_reply, report_patch} JSON
+      - kind=error  : error message
+    """
+    try:
+        cfg = ModelConfig.from_env()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="AI 服务不可用")
+
+    async def event_generator():
+        try:
+            # Timeout slightly longer than the Rust-side SO_RCVTIMEO (120 s) so
+            # the client sees a clean error event rather than a socket timeout.
+            async with asyncio.timeout(130):
+                async for evt in generate_chat_stream(ctx, cfg):
+                    yield evt
+        except TimeoutError:
+            logger.error("Chat stream timed out after 130 s (thread_id=%s)", ctx.thread_id)
+            yield {
+                "event": "message",
+                "data": StreamDelta(kind="error", content="对话生成超时，请重试").model_dump_json(),
+            }
+        except Exception:
+            logger.error("Chat stream failed: %s", traceback.format_exc())
+            yield {
+                "event": "message",
+                "data": StreamDelta(kind="error", content="对话生成失败，请重试").model_dump_json(),
+            }
+
+    return EventSourceResponse(event_generator())
+
+
 @app.post("/generate/prd")
 async def generate_prd(ctx: PRDContext):
     """Run PRD AI generation with SSE streaming.
@@ -161,8 +228,12 @@ async def generate_prd(ctx: PRDContext):
     async def event_generator():
         try:
             initial_state: PRDState = {
-                "context": ctx, "config": cfg, "agent_reply": "",
-                "deltas": [], "structured": {}, "error": None,
+                "context": ctx,
+                "config": cfg,
+                "agent_reply": "",
+                "deltas": [],
+                "structured": {},
+                "error": None,
             }
             async for evt in _sse_stream_graph(_prd_graph, initial_state, "agent", "PRD"):
                 yield evt
@@ -193,8 +264,12 @@ async def generate_development(ctx: DevelopmentContext):
     async def event_generator():
         try:
             initial_state: DevState = {
-                "context": ctx, "config": cfg, "architect_reply": "",
-                "deltas": [], "structured": {}, "error": None,
+                "context": ctx,
+                "config": cfg,
+                "architect_reply": "",
+                "deltas": [],
+                "structured": {},
+                "error": None,
             }
             async for evt in _sse_stream_graph(_dev_graph, initial_state, "architect", "研发方案"):
                 yield evt
@@ -202,7 +277,9 @@ async def generate_development(ctx: DevelopmentContext):
             logger.error("Development generation failed: %s", traceback.format_exc())
             yield {
                 "event": "message",
-                "data": StreamDelta(kind="error", content="研发方案生成失败，请重试").model_dump_json(),
+                "data": StreamDelta(
+                    kind="error", content="研发方案生成失败，请重试"
+                ).model_dump_json(),
             }
 
     return EventSourceResponse(event_generator())
@@ -219,10 +296,16 @@ async def generate_development_coding(ctx: CodingContext):
     async def event_generator():
         try:
             initial_state: CodingState = {
-                "context": ctx, "config": cfg, "coding_reply": "",
-                "deltas": [], "structured": {}, "error": None,
+                "context": ctx,
+                "config": cfg,
+                "coding_reply": "",
+                "deltas": [],
+                "structured": {},
+                "error": None,
             }
-            async for evt in _sse_stream_graph(_coding_graph, initial_state, "coding_agent", "代码生成"):
+            async for evt in _sse_stream_graph(
+                _coding_graph, initial_state, "coding_agent", "代码生成"
+            ):
                 yield evt
         except Exception:
             logger.error("Coding generation failed: %s", traceback.format_exc())

@@ -36,6 +36,12 @@ extension IPCContract {
         static let deleteProjectCommand = "command.delete_project"
         static let deleteProjectSuccess = "command.delete_project.ok"
 
+        // Streaming creation message
+        static let addCreationMessageStreamCommand = "command.add_creation_message_stream"
+        static let creationMessageDelta = "event.creation_message.delta"
+        static let creationMessageDone = "event.creation_message.done"
+        static let creationMessageError = "event.creation_message.error"
+
         static let error = "error"
     }
 }

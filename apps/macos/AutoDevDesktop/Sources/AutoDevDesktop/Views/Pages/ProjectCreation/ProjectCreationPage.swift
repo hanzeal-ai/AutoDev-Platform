@@ -69,7 +69,10 @@ struct ProjectCreationPage: View {
                         creationInputInsertionRequest: creationInputInsertionRequestBinding,
                         onImportMaterials: { viewModel.setMaterialImporterPresented(true) },
                         onRemoveMaterial: { materialID in viewModel.removeCreationMaterial(materialID) },
-                        onSendMessage: { threadID, input in viewModel.sendCreationInput(threadID: threadID, input) }
+                        onSendMessage: { threadID, input in viewModel.sendCreationInput(threadID: threadID, input) },
+                        onRetryLastMessage: { threadID in viewModel.retryLastCreationMessage(threadID: threadID) },
+                        onStopGenerating: isSendingCreationMessage ? { viewModel.cancelCreationMessage() } : nil,
+                        onQuickPrompt: { prompt in viewModel.updateCreationInputDraft(prompt) }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 

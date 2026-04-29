@@ -29,6 +29,18 @@ impl Store {
         chat::generate_clarification_turn(self, thread_id, user_message)
     }
 
+    pub(in crate::store) fn generate_clarification_turn_streaming<F>(
+        &self,
+        thread_id: &str,
+        user_message: &str,
+        on_delta: F,
+    ) -> StoreResult<chat::ClarificationTurn>
+    where
+        F: FnMut(&str) -> StoreResult<()>,
+    {
+        chat::generate_clarification_turn_streaming(self, thread_id, user_message, on_delta)
+    }
+
     pub(super) fn generate_final_report(&self, thread_id: &str) -> StoreResult<Value> {
         if !llm::worker::worker_available() {
             return Err(

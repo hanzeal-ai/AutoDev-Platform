@@ -104,4 +104,107 @@ extension DaemonClient {
             expectedResponse: IPCContract.MessageType.deleteProjectSuccess
         ) { _ in true }
     }
+
+    // MARK: - Streaming Creation Message
+
+    func addCreationMessageStreaming(
+        threadID: String,
+        content: String
+    ) -> CreationStreamingHandle {
+        let cancelHandle = CancellableSocket()
+        let handle = CreationStreamingHandle(cancelHandle: cancelHandle)
+
+        handle.stream = AsyncStream { continuation in
+            continuation.onTermination = { @Sendable _ in
+                cancelHandle.cancel()
+            }
+
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                do {
+                    let line = try Self.encodeRequestLine(
+                        messageType: IPCContract.MessageType.addCreationMessageStreamCommand,
+                        payload: Self.addCreationMessagePayload(threadID: threadID, content: content)
+                    )
+                    try DaemonUnixSocketTransport.exchangeStreaming(
+                        line: line,
+                        socketPath: socketPath,
+                        cancelHandle: cancelHandle,
+                        timeoutSeconds: 120
+                    ) { responseData in
+                        // Check cancellation on each line
+                        guard !cancelHandle.isCancelled else { return false }
+
+                        guard let envelope = try? IPCResponseEnvelope.decode(from: responseData) else {
+                            return true // skip unparseable lines
+                        }
+
+                        switch envelope.messageType {
+                        case IPCContract.MessageType.creationMessageDelta:
+                            if let delta = envelope.payload["delta"] as? String {
+                                continuation.yield(.delta(delta))
+                            }
+                            return true
+
+                        case IPCContract.MessageType.creationMessageDone:
+                            do {
+                                let result = try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: envelope.payload)
+                                continuation.yield(.done(result))
+                            } catch {
+                                continuation.yield(.error(error.localizedDescription))
+                            }
+                            continuation.finish()
+                            return false
+
+                        case IPCContract.MessageType.creationMessageError:
+                            let errorMsg = envelope.payload["error"] as? String ?? "Unknown error"
+                            continuation.yield(.error(errorMsg))
+                            continuation.finish()
+                            return false
+
+                        case IPCContract.MessageType.error:
+                            let detail = envelope.payload["detail"] as? String ?? "Request failed"
+                            continuation.yield(.error(detail))
+                            continuation.finish()
+                            return false
+
+                        default:
+                            return true
+                        }
+                    }
+                    // If we got here without finishing (e.g. cancelled), finish now
+                    continuation.finish()
+                } catch {
+                    if !cancelHandle.isCancelled {
+                        continuation.yield(.error(error.localizedDescription))
+                    }
+                    continuation.finish()
+                }
+            }
+        }
+
+        return handle
+    }
+}
+
+// MARK: - Stream Event & Handle
+
+enum CreationStreamEvent: Sendable {
+    case delta(String)
+    case done(DaemonCommandResult)
+    case error(String)
+}
+
+/// Bundles an AsyncStream with a cancellation handle for direct socket shutdown.
+final class CreationStreamingHandle: @unchecked Sendable {
+    var stream: AsyncStream<CreationStreamEvent> = AsyncStream { $0.finish() }
+    private let cancelHandle: CancellableSocket
+
+    init(cancelHandle: CancellableSocket) {
+        self.cancelHandle = cancelHandle
+    }
+
+    /// Immediately shuts down the underlying socket, stopping all I/O.
+    func cancel() {
+        cancelHandle.cancel()
+    }
 }

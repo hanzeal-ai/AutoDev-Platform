@@ -13,7 +13,7 @@ impl Store {
         self.conn
             .execute(
                 "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'user', ?3, ?4)",
-                params![Uuid::new_v4().to_string(), thread_id, content, now],
+                params![Uuid::new_v4().to_string(), &thread_id, content, now],
             )
             .map_err(|err| err.to_string())?;
 
@@ -36,7 +36,7 @@ impl Store {
         self.conn
             .execute(
                 "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'ai', ?3, ?4)",
-                params![Uuid::new_v4().to_string(), thread_id, assistant_message, now],
+                params![Uuid::new_v4().to_string(), &thread_id, assistant_message, now],
             )
             .map_err(|err| err.to_string())?;
 
@@ -46,6 +46,93 @@ impl Store {
             "thread_id": thread_id,
             "assistant_message": assistant_message,
             "report_draft": self.thread_report_draft(thread_id)?
+        }))
+    }
+
+    /// Streaming variant of add_creation_message.
+    /// Calls on_delta for each streaming text chunk from the AI worker.
+    /// After streaming completes, inserts the AI message to DB and returns final result.
+    pub fn add_creation_message_streaming<F>(
+        &self,
+        thread_id: &str,
+        content: &str,
+        on_delta: F,
+    ) -> StoreResult<Value>
+    where
+        F: FnMut(&str) -> StoreResult<()>,
+    {
+        let thread_id = thread_id.to_lowercase();
+        self.ensure_active_creation_thread(&thread_id)?;
+
+        // Open a SAVEPOINT so that if the AI call fails, the user message
+        // INSERT is rolled back and the thread stays consistent.
+        self.conn
+            .execute("SAVEPOINT sp_streaming_msg", [])
+            .map_err(|err| err.to_string())?;
+
+        let user_now = now_ms();
+        let insert_user = self.conn.execute(
+            "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'user', ?3, ?4)",
+            params![Uuid::new_v4().to_string(), thread_id, content, user_now],
+        );
+        if let Err(err) = insert_user {
+            let _ = self
+                .conn
+                .execute("ROLLBACK TO SAVEPOINT sp_streaming_msg", []);
+            let _ = self.conn.execute("RELEASE SAVEPOINT sp_streaming_msg", []);
+            return Err(err.to_string());
+        }
+
+        let ai_turn =
+            match self.generate_clarification_turn_streaming(&thread_id, content, on_delta) {
+                Ok(turn) => turn,
+                Err(err) => {
+                    logger::error_fields(
+                        "add_creation_message_streaming failed",
+                        &[
+                            ("thread_id", thread_id.clone()),
+                            ("reason", err.clone()),
+                            ("user_message", content.to_string()),
+                        ],
+                    );
+                    // Roll back the user message so the DB stays consistent.
+                    let _ = self
+                        .conn
+                        .execute("ROLLBACK TO SAVEPOINT sp_streaming_msg", []);
+                    let _ = self.conn.execute("RELEASE SAVEPOINT sp_streaming_msg", []);
+                    return Err(err);
+                }
+            };
+
+        let assistant_message = ai_turn.assistant_message;
+        let report_patch = ai_turn.report_patch;
+
+        // Use a fresh timestamp so the AI message time reflects when
+        // streaming finished, not when the user sent the message.
+        let ai_now = now_ms();
+        let insert_ai = self.conn.execute(
+            "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'ai', ?3, ?4)",
+            params![Uuid::new_v4().to_string(), thread_id, assistant_message, ai_now],
+        );
+        if let Err(err) = insert_ai {
+            let _ = self
+                .conn
+                .execute("ROLLBACK TO SAVEPOINT sp_streaming_msg", []);
+            let _ = self.conn.execute("RELEASE SAVEPOINT sp_streaming_msg", []);
+            return Err(err.to_string());
+        }
+
+        // All writes succeeded — commit the savepoint.
+        self.conn
+            .execute("RELEASE SAVEPOINT sp_streaming_msg", [])
+            .map_err(|err| err.to_string())?;
+
+        self.update_report_from_patch(&thread_id, &report_patch, ai_now)?;
+        self.touch_thread(&thread_id, ai_now)?;
+        Ok(json!({
+            "thread_id": thread_id,
+            "assistant_message": assistant_message,
+            "report_draft": self.thread_report_draft(&thread_id)?
         }))
     }
 

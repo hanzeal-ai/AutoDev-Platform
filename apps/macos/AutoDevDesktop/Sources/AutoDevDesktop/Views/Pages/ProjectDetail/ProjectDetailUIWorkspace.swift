@@ -2,7 +2,8 @@ import SwiftUI
 
 extension ProjectDetailPage {
     func uiWorkspace(detail: DeliveryExecutionDetail?) -> some View {
-        let activeSubStep = detail?.activeSubStep ?? viewModel.state.selectedSubStep ?? "page_map"
+        let subSteps = detail?.subSteps ?? []
+        let activeSubStep = resolvedActiveSubStep(detail: detail, subSteps: subSteps) ?? "page_map"
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
             if activeSubStep == "interaction" {
@@ -69,6 +70,26 @@ extension ProjectDetailPage {
         let confirmPoint = AutoDevTextSupport.value(for: "待确认设计点", in: lines)
         let artifacts = detail?.outputArtifacts ?? []
         let prototypeDownloads = stageDownloads(in: [.stageSnapshot])
+        let interactionComplete = detail?.subSteps.first(where: { $0.key == "interaction" })?.hasContent == true
+
+        stageModule("交付状态", when: !interactionComplete) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "hourglass")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("交互稿内容已返回，但原型文件尚未写入完成")
+                        .font(.subheadline.weight(.semibold))
+                    Text("在出现交互稿下载物之前，当前步骤不会视为完成。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
 
         stageModule("交互稿下载", when: !prototypeDownloads.isEmpty) {
             StageDownloadListView(viewModel: viewModel, items: prototypeDownloads)

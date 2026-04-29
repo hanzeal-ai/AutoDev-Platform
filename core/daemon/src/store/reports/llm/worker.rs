@@ -264,3 +264,105 @@ pub(crate) fn request_chat_clarification(
         format!("解析 AI Worker chat JSON 失败: {err}")
     })
 }
+
+/// Request a streaming chat clarification turn from the Python worker via SSE.
+///
+/// Similar to `request_stage_generation`, this calls `POST /generate/chat/stream`
+/// and processes the SSE stream:
+///   - `kind=delta`  → calls `on_delta` callback (streaming text)
+///   - `kind=result` → returns structured JSON `{assistant_reply, report_patch}`
+///   - `kind=error`  → returns error
+pub(crate) fn request_chat_clarification_streaming<F>(
+    thread_id: &str,
+    user_message: &str,
+    draft: &Value,
+    messages: &[Value],
+    materials: &[Value],
+    mut on_delta: F,
+) -> StoreResult<Value>
+where
+    F: FnMut(&str) -> StoreResult<()>,
+{
+    let url = format!("{}/generate/chat/stream", worker_base_url());
+
+    let body = json!({
+        "thread_id": thread_id,
+        "user_message": user_message,
+        "draft": draft,
+        "messages": messages,
+        "materials": materials,
+    });
+
+    let agent = make_agent(Duration::from_secs(120));
+
+    let response = agent
+        .post(&url)
+        .set("Content-Type", "application/json")
+        .set("Accept", "text/event-stream")
+        .send_json(body)
+        .map_err(|err| {
+            let reason = format!("AI Worker chat stream 请求失败: {err}");
+            logger::error_fields(
+                "ai_worker chat_stream request failed",
+                &[
+                    ("thread_id", thread_id.to_string()),
+                    ("reason", reason.clone()),
+                ],
+            );
+            reason
+        })?;
+
+    let reader = BufReader::new(response.into_reader());
+    let mut result_value: Option<Value> = None;
+    let mut last_error: Option<String> = None;
+
+    for line in reader.lines() {
+        let line = line.map_err(|err| format!("读取 AI Worker chat SSE 失败: {err}"))?;
+        let line = line.trim().to_string();
+
+        if !line.starts_with("data:") {
+            continue;
+        }
+        let data = line.trim_start_matches("data:").trim();
+        if data.is_empty() || data == "[DONE]" {
+            continue;
+        }
+
+        let event: Value = match serde_json::from_str(data) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let kind = event.get("kind").and_then(Value::as_str).unwrap_or("");
+
+        match kind {
+            "delta" => {
+                if let Some(content) = event.get("content").and_then(Value::as_str) {
+                    if !content.is_empty() {
+                        on_delta(content)?;
+                    }
+                }
+            }
+            "result" => {
+                if let Some(structured) = event.get("structured") {
+                    result_value = Some(structured.clone());
+                }
+            }
+            "error" => {
+                let msg = event
+                    .get("content")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown error")
+                    .to_string();
+                last_error = Some(msg);
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(err) = last_error {
+        return Err(format!("AI Worker chat stream 返回错误: {err}"));
+    }
+
+    result_value.ok_or_else(|| "AI Worker chat SSE 流结束但未返回结构化结果".to_string())
+}

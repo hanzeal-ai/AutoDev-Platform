@@ -13,7 +13,11 @@ let package = Package(
         .executableTarget(
             name: "AutoDevDesktop",
             path: "Sources/AutoDevDesktop",
-            sources: ["."]
+            exclude: ["Views/Components/Chat/Resources"],
+            sources: ["."],
+            resources: [
+                .copy("Views/Components/Chat/Resources/chat-message.html"),
+            ]
         ),
         .testTarget(
             name: "AutoDevDesktopTests",

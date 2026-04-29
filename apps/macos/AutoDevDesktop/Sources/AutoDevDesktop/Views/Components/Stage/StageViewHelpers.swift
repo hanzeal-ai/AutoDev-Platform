@@ -19,8 +19,25 @@ struct HandCursorOnHover: ViewModifier {
     }
 }
 
+/// ViewModifier that shows the not-allowed cursor on hover.
+struct DisabledCursorOnHover: ViewModifier {
+    func body(content: Content) -> some View {
+        content.onHover { hovering in
+            if hovering {
+                NSCursor.operationNotAllowed.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+}
+
 extension View {
     func handCursorOnHover() -> some View {
         modifier(HandCursorOnHover())
+    }
+
+    func disabledCursorOnHover() -> some View {
+        modifier(DisabledCursorOnHover())
     }
 }

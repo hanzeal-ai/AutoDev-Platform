@@ -5,6 +5,11 @@ mod payload;
 use crate::logger;
 use crate::protocol;
 use crate::runtime;
+use std::os::unix::net::UnixStream;
+
+pub fn is_streaming_command(inbound: &protocol::EnvelopeIn) -> bool {
+    inbound.message_type == protocol::MESSAGE_COMMAND_ADD_CREATION_MESSAGE_STREAM
+}
 
 pub fn route_request(
     inbound: protocol::EnvelopeIn,
@@ -42,6 +47,36 @@ pub fn route_request(
                 inbound.schema_version,
                 detail,
             )
+        }
+    }
+}
+
+pub fn route_streaming_request(
+    inbound: protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+    writer: &mut UnixStream,
+) {
+    let correlation_id = inbound.response_correlation_id();
+    let schema_version = inbound.response_schema_version();
+
+    match inbound.message_type.as_str() {
+        protocol::MESSAGE_COMMAND_ADD_CREATION_MESSAGE_STREAM => {
+            dispatch_command::dispatch_streaming_add_message(
+                &inbound,
+                runtime_paths,
+                writer,
+                &correlation_id,
+                schema_version,
+            );
+        }
+        _ => {
+            let out = protocol::EnvelopeOut::error(
+                "unsupported_streaming",
+                Some(correlation_id),
+                Some(schema_version),
+                format!("unsupported streaming message_type: {}", inbound.message_type),
+            );
+            let _ = crate::server::write_envelope(writer, &out);
         }
     }
 }

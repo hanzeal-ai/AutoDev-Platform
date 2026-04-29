@@ -19,12 +19,22 @@ pub(super) fn generate_stage_ai_content(
     feedback: Option<&str>,
 ) -> StoreResult<bool> {
     request_and_persist_stage_ai_content(
-        store, run_id, project_id, project_name,
-        stage, defaults, feasibility, feedback,
+        store,
+        run_id,
+        project_id,
+        project_name,
+        stage,
+        defaults,
+        feasibility,
+        feedback,
     )
 }
 
-pub(super) fn create_stage_ai_run(store: &Store, project_id: &str, stage: &str) -> StoreResult<String> {
+pub(super) fn create_stage_ai_run(
+    store: &Store,
+    project_id: &str,
+    stage: &str,
+) -> StoreResult<String> {
     let run_id = Uuid::new_v4().to_string();
     upsert_ai_run(store, &run_id, project_id, stage, "dispatched", None)?;
     Ok(run_id)
@@ -42,8 +52,13 @@ fn request_and_persist_stage_ai_content(
 ) -> StoreResult<bool> {
     logger::info("stage_ai: routing through AI Worker (LangGraph)");
     request_via_worker(
-        store, run_id, project_id, project_name,
-        stage, defaults, feasibility,
+        store,
+        run_id,
+        project_id,
+        project_name,
+        stage,
+        defaults,
+        feasibility,
     )
 }
 
@@ -65,7 +80,14 @@ fn request_via_worker(
         &format!("已为 {} 阶段创建 LangGraph Agent。", stage_label(stage)),
     )?;
 
-    upsert_ai_run(store, run_id, project_id, stage, "waiting_first_delta", None)?;
+    upsert_ai_run(
+        store,
+        run_id,
+        project_id,
+        stage,
+        "waiting_first_delta",
+        None,
+    )?;
 
     let reply_event_id = Uuid::new_v4().to_string();
     insert_stage_event_with_id(
@@ -115,8 +137,26 @@ fn request_via_worker(
         }
     };
 
-    // Worker already returns normalized structured JSON — persist directly
+    // Worker already returns normalized structured JSON — persist directly.
+    // UI also needs sub-step stage rows so page_map / interaction can render independently.
     normalizer::persist_stage_content(store, project_id, stage, defaults, &stage_content)?;
+    if stage == "ui" {
+        normalizer::persist_ui_sub_steps(store, project_id, &stage_content, defaults)?;
+        insert_stage_event(
+            store,
+            project_id,
+            "ui:page_map",
+            "AI：页面地图已生成",
+            "页面结构与页面地图内容已拆分并写入，可继续查看交互稿。",
+        )?;
+        insert_stage_event(
+            store,
+            project_id,
+            "ui:interaction",
+            "AI：交互稿已生成",
+            "核心交互流、关键组件与交互稿文档已拆分并写入。",
+        )?;
+    }
     insert_stage_event(
         store,
         project_id,
@@ -127,7 +167,6 @@ fn request_via_worker(
     upsert_ai_run(store, run_id, project_id, stage, "completed", None)?;
     Ok(true)
 }
-
 
 fn insert_stage_event(
     store: &Store,

@@ -68,6 +68,69 @@ pub(super) fn generate_clarification_turn(
     })
 }
 
+/// Streaming variant — streams deltas via callback, then returns the final ClarificationTurn.
+pub(super) fn generate_clarification_turn_streaming<F>(
+    store: &Store,
+    thread_id: &str,
+    user_message: &str,
+    mut on_delta: F,
+) -> StoreResult<ClarificationTurn>
+where
+    F: FnMut(&str) -> StoreResult<()>,
+{
+    if !worker::worker_available() {
+        return Err(
+            "AI Worker 不可用，无法生成对话。请确保 Python AI Worker 正在运行。".to_string(),
+        );
+    }
+
+    let draft = store.thread_report_draft(thread_id)?;
+    let recent_messages = list_recent_messages(store, thread_id, MAX_CONTEXT_MESSAGES)?;
+    let recent_materials = list_recent_materials(store, thread_id, MAX_CONTEXT_MATERIALS)?;
+
+    let messages: Vec<Value> = recent_messages
+        .iter()
+        .map(|m| serde_json::to_value(m).unwrap_or_default())
+        .collect();
+    let materials: Vec<Value> = recent_materials
+        .iter()
+        .map(|m| serde_json::to_value(m).unwrap_or_default())
+        .collect();
+
+    let candidate = worker::request_chat_clarification_streaming(
+        thread_id,
+        user_message,
+        &draft,
+        &messages,
+        &materials,
+        |delta| on_delta(delta),
+    )?;
+
+    let reply = candidate
+        .get("assistant_reply")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            logger::error_fields(
+                "worker chat stream response missing assistant_reply",
+                &[
+                    ("thread_id", thread_id.to_string()),
+                    ("response_data", candidate.to_string()),
+                ],
+            );
+            "AI Worker 流式响应缺少有效 assistant_reply".to_string()
+        })?;
+
+    let report_patch = normalize_report_patch(candidate.get("report_patch"));
+
+    Ok(ClarificationTurn {
+        assistant_message: reply,
+        report_patch,
+    })
+}
+
 fn normalize_report_patch(candidate: Option<&Value>) -> Value {
     let Some(Value::Object(raw_patch)) = candidate else {
         return json!({});

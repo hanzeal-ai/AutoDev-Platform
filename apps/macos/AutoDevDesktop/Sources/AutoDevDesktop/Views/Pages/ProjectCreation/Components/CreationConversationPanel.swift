@@ -12,6 +12,9 @@ struct CreationConversationPanel: View {
     let onImportMaterials: () -> Void
     let onRemoveMaterial: (UUID) -> Void
     let onSendMessage: (UUID, String) -> Void
+    var onRetryLastMessage: ((UUID) -> Void)? = nil
+    var onStopGenerating: (() -> Void)? = nil
+    var onQuickPrompt: ((String) -> Void)? = nil
 
     var body: some View {
         DashboardCard(title: "AI 立项对话") {
@@ -40,21 +43,7 @@ struct CreationConversationPanel: View {
 
                 Divider()
 
-                ScrollView {
-                    LazyVStack(spacing: AutoDevViewTheme.compactSpacing) {
-                        if selectedMessages.isEmpty {
-                            Text("暂无会话内容。")
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            ForEach(selectedMessages) { message in
-                                CreationMessageRowView(message: message)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .frame(maxHeight: .infinity)
+                messageList
 
                 Divider()
 
@@ -63,12 +52,136 @@ struct CreationConversationPanel: View {
                     isSending: isSendingMessage,
                     draft: creationInputDraft,
                     insertionRequest: creationInputInsertionRequest,
+                    stage: selectedThreadStage,
                     onSend: { threadID, value in
                         onSendMessage(threadID, value)
-                    }
+                    },
+                    onStop: onStopGenerating
                 )
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
+    }
+
+    // MARK: - Message List with Smart Scrolling
+
+    @ViewBuilder
+    private var messageList: some View {
+        if selectedMessages.isEmpty {
+            emptyStateView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: AutoDevViewTheme.compactSpacing) {
+                        ForEach(Array(selectedMessages.enumerated()), id: \.element.id) { index, message in
+                            let isLastAI = isLastAIMessage(at: index)
+                            CreationMessageRowView(
+                                message: message,
+                                isLastAIMessage: isLastAI,
+                                onRetry: isLastAI ? {
+                                    if let threadID = selectedThreadID {
+                                        onRetryLastMessage?(threadID)
+                                    }
+                                } : nil
+                            )
+                            .id(message.id)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .frame(maxHeight: .infinity)
+                .onChange(of: selectedMessages.count) { _ in
+                    // Auto-scroll to bottom when new messages arrive
+                    if let lastID = selectedMessages.last?.id {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(lastID, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: selectedMessages.last?.content) { _ in
+                    // Also scroll during streaming content updates
+                    if let lastID = selectedMessages.last?.id {
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Empty State Guide
+
+    @ViewBuilder
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "sparkles")
+                .font(.system(size: 28))
+                .foregroundColor(.accentColor.opacity(0.6))
+            Text("开始你的项目构想")
+                .font(.headline)
+                .foregroundColor(.secondary)
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 10),
+                GridItem(.flexible(), spacing: 10)
+            ], spacing: 10) {
+                quickPromptCard(
+                    icon: "💡",
+                    title: "描述产品想法",
+                    prompt: "我想做一个"
+                )
+                quickPromptCard(
+                    icon: "📋",
+                    title: "从需求出发",
+                    prompt: "我的核心需求是"
+                )
+                quickPromptCard(
+                    icon: "🔍",
+                    title: "分析竞品差异",
+                    prompt: "市面上已有类似产品，我想做的差异化是"
+                )
+                quickPromptCard(
+                    icon: "🎯",
+                    title: "明确目标用户",
+                    prompt: "我的目标用户是"
+                )
+            }
+            .padding(.horizontal, 20)
+            Spacer()
+        }
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func quickPromptCard(icon: String, title: String, prompt: String) -> some View {
+        Button(action: { onQuickPrompt?(prompt) }) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(icon)
+                    .font(.title3)
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.primary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Helpers
+
+    private func isLastAIMessage(at index: Int) -> Bool {
+        guard selectedMessages[index].role == .ai else { return false }
+        let remaining = selectedMessages.suffix(from: index + 1)
+        return !remaining.contains(where: { $0.role == .ai && !$0.isLoading })
     }
 }

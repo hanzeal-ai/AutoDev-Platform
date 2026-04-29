@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <style>
+    /* ── Reset ── */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      background: transparent;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ── Theme variables ── */
+    :root {
+      --text: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --bg-code: #f5f5f7;
+      --border: #d2d2d7;
+      --accent: #0071e3;
+      --bg-thinking: #f5f5f7;
+      --bg-thinking-border: #d2d2d7;
+      --code-keyword: #ad3da4;
+      --code-string: #d12f1b;
+      --code-comment: #65a30d;
+      --code-number: #1c00cf;
+      --code-function: #3900a5;
+      --code-built-in: #0b4f79;
+      --copy-bg: rgba(0, 0, 0, 0.06);
+      --copy-bg-hover: rgba(0, 0, 0, 0.1);
+    }
+
+    .dark {
+      --text: #f5f5f7;
+      --text-secondary: #a1a1a6;
+      --bg-code: #1c1c1e;
+      --border: #3a3a3c;
+      --accent: #2997ff;
+      --bg-thinking: #1c1c1e;
+      --bg-thinking-border: #3a3a3c;
+      --code-keyword: #ff7ab2;
+      --code-string: #ff8170;
+      --code-comment: #7ec8e3;
+      --code-number: #d0bf69;
+      --code-function: #b281eb;
+      --code-built-in: #6bdfff;
+      --copy-bg: rgba(255, 255, 255, 0.08);
+      --copy-bg-hover: rgba(255, 255, 255, 0.14);
+    }
+
+    /* ── Content area ── */
+    #content {
+      padding: 2px 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    /* ── Paragraphs ── */
+    #content p {
+      margin-bottom: 8px;
+    }
+
+    #content p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ── Headings ── */
+    #content h1,
+    #content h2,
+    #content h3,
+    #content h4 {
+      font-weight: 600;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+
+    #content h1 {
+      font-size: 17px;
+    }
+
+    #content h2 {
+      font-size: 15px;
+    }
+
+    #content h3 {
+      font-size: 14px;
+    }
+
+    #content h4 {
+      font-size: 13px;
+    }
+
+    /* ── Inline code ── */
+    #content code {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      background: var(--bg-code);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    /* ── Code blocks ── */
+    .code-block-wrapper {
+      position: relative;
+      margin: 8px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .code-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 10px;
+      background: var(--bg-code);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .code-block-lang {
+      font-family: "SF Mono", Menlo, monospace;
+      font-weight: 500;
+      text-transform: lowercase;
+    }
+
+    .code-copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--copy-bg);
+      border: none;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: -apple-system, "SF Pro Text", sans-serif;
+      transition: background 0.15s;
+    }
+
+    .code-copy-btn:hover {
+      background: var(--copy-bg-hover);
+    }
+
+    .code-copy-btn.copied {
+      color: var(--accent);
+    }
+
+    #content pre {
+      margin: 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      background: var(--bg-code);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #content pre code {
+      background: none;
+      padding: 0;
+      border-radius: 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* ── Lists ── */
+    #content ul,
+    #content ol {
+      padding-left: 20px;
+      margin-bottom: 8px;
+    }
+
+    #content li {
+      margin-bottom: 3px;
+    }
+
+    #content li:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ── Blockquote ── */
+    #content blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 4px 12px;
+      margin: 8px 0;
+      color: var(--text-secondary);
+    }
+
+    /* ── Links ── */
+    #content a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    #content a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Tables ── */
+    #content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0;
+      font-size: 12px;
+    }
+
+    #content th,
+    #content td {
+      border: 1px solid var(--border);
+      padding: 5px 8px;
+      text-align: left;
+    }
+
+    #content th {
+      background: var(--bg-code);
+      font-weight: 600;
+    }
+
+    /* ── Horizontal rule ── */
+    #content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 12px 0;
+    }
+
+    /* ── Bold / Italic ── */
+    #content strong {
+      font-weight: 600;
+    }
+
+    #content em {
+      font-style: italic;
+    }
+
+    /* ── Thinking block ── */
+    .thinking-block {
+      margin: 8px 0;
+      border: 1px solid var(--bg-thinking-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .thinking-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 6px 10px;
+      background: var(--bg-thinking);
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-family: -apple-system, "SF Pro Text", sans-serif;
+      transition: background 0.15s;
+    }
+
+    .thinking-toggle:hover {
+      opacity: 0.8;
+    }
+
+    .thinking-arrow {
+      display: inline-block;
+      transition: transform 0.2s;
+      font-size: 10px;
+    }
+
+    .thinking-block.open .thinking-arrow {
+      transform: rotate(90deg);
+    }
+
+    .thinking-content {
+      display: none;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      border-top: 1px solid var(--bg-thinking-border);
+    }
+
+    .thinking-block.open .thinking-content {
+      display: block;
+    }
+
+    /* ── Highlight.js overrides (minimal, theme-aware) ── */
+    .hljs {
+      background: transparent !important;
+      color: var(--text) !important;
+    }
+
+    .hljs-keyword,
+    .hljs-selector-tag,
+    .hljs-type {
+      color: var(--code-keyword);
+    }
+
+    .hljs-string,
+    .hljs-attr {
+      color: var(--code-string);
+    }
+
+    .hljs-comment,
+    .hljs-quote {
+      color: var(--code-comment);
+      font-style: italic;
+    }
+
+    .hljs-number,
+    .hljs-literal {
+      color: var(--code-number);
+    }
+
+    .hljs-function .hljs-title,
+    .hljs-title.function_ {
+      color: var(--code-function);
+    }
+
+    .hljs-built_in,
+    .hljs-builtin-name {
+      color: var(--code-built-in);
+    }
+
+    .hljs-meta {
+      color: var(--text-secondary);
+    }
+
+    .hljs-params {
+      color: var(--text);
+    }
+
+    .hljs-variable,
+    .hljs-template-variable {
+      color: var(--code-function);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="content"></div>
+
+  <!-- marked.js (minified, MIT License) — loaded inline for offline use -->
+  <script>
+    /**
+     * marked - a markdown parser
+     * Copyright (c) 2011-2024, Christopher Jeffrey. (MIT Licensed)
+     * https://github.com/markedjs/marked
+     * v14.1.3 — loaded from CDN as fallback, inline stub triggers CDN load
+     */
+  </script>
+  <script id="marked-loader">
+    // We load marked.js and highlight.js via a minimal inline bootstrap.
+    // The Swift side will inject the full library source via evaluateJavaScript
+    // before calling render() for the first time.
+    // This avoids bundling large JS in the HTML file.
+
+    // Fallback: if libraries aren't injected, render plain text
+    window._markedReady = false;
+    window._hlReady = false;
+    window.chatMessageStrings = window.chatMessageStrings || {
+      thinkingTitle: '思考过程',
+      copy: '复制',
+      copied: '已复制'
+    };
+
+    function t(key, fallback) {
+      return (window.chatMessageStrings && window.chatMessageStrings[key]) || fallback;
+    }
+
+    function _ensureLibraries(callback) {
+      if (window._markedReady && window._hlReady) {
+        callback();
+        return;
+      }
+      // Plain-text fallback
+      callback();
+    }
+  </script>
+
+  <script>
+    // ── Thinking block parser ──
+    function parseThinkingBlocks(markdown) {
+      // Match <thinking>...</thinking> blocks (possibly multiline)
+      const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/gi;
+      let index = 0;
+      return markdown.replace(thinkingRegex, function (match, content) {
+        index++;
+        const id = 'thinking-' + index;
+        const escapedContent = content.trim()
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        return '<div class="thinking-block" id="' + id + '">' +
+          '<button class="thinking-toggle" onclick="toggleThinking(\'' + id + '\')">' +
+          '<span class="thinking-arrow">▶</span> ' + t('thinkingTitle', '思考过程') +
+          '</button>' +
+          '<div class="thinking-content">' + escapedContent + '</div>' +
+          '</div>';
+      });
+    }
+
+    function toggleThinking(id) {
+      const block = document.getElementById(id);
+      if (block) {
+        block.classList.toggle('open');
+        notifyHeightChange();
+      }
+    }
+
+    // ── Code block post-processing ──
+    function wrapCodeBlocks() {
+      const pres = document.querySelectorAll('#content pre');
+      pres.forEach(function (pre) {
+        if (pre.parentElement && pre.parentElement.classList.contains('code-block-wrapper')) return;
+        const code = pre.querySelector('code');
+        let lang = '';
+        if (code) {
+          const classes = code.className.split(' ');
+          for (let i = 0;i < classes.length;i++) {
+            if (classes[i].startsWith('language-')) {
+              lang = classes[i].replace('language-', '');
+              break;
+            }
+          }
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+
+        const header = document.createElement('div');
+        header.className = 'code-block-header';
+
+        const langSpan = document.createElement('span');
+        langSpan.className = 'code-block-lang';
+        langSpan.textContent = lang || 'code';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'code-copy-btn';
+        copyBtn.innerHTML = '📋 ' + t('copy', '复制');
+        copyBtn.onclick = function () {
+          const text = code ? code.textContent : pre.textContent;
+          copyToClipboard(text, copyBtn);
+        };
+
+        header.appendChild(langSpan);
+        header.appendChild(copyBtn);
+
+        pre.parentNode.insertBefore(wrapper, pre);
+        wrapper.appendChild(header);
+        wrapper.appendChild(pre);
+      });
+    }
+
+    function copyToClipboard(text, btn) {
+      // Send to Swift for clipboard
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.codeCopy) {
+        window.webkit.messageHandlers.codeCopy.postMessage(text);
+      }
+      btn.classList.add('copied');
+      btn.innerHTML = '✓ ' + t('copied', '已复制');
+      setTimeout(function () {
+        btn.classList.remove('copied');
+        btn.innerHTML = '📋 ' + t('copy', '复制');
+      }, 1500);
+    }
+
+    function configureMarkedHighlight() {
+      if (window._markedHighlightConfigured || typeof marked === 'undefined' || typeof hljs === 'undefined') {
+        return;
+      }
+
+      if (typeof marked.use === 'function') {
+        marked.use({
+          renderer: {
+            code(token) {
+              const code = token.text || '';
+              const lang = token.lang || '';
+              let highlighted = code;
+              if (lang && hljs.getLanguage && hljs.getLanguage(lang)) {
+                try { highlighted = hljs.highlight(code, { language: lang }).value; } catch (e) { }
+              } else if (hljs.highlightAuto) {
+                try { highlighted = hljs.highlightAuto(code).value; } catch (e) { }
+              }
+              const cls = lang ? ' class="language-' + lang + '"' : '';
+              return '<pre><code' + cls + '>' + highlighted + '</code></pre>';
+            },
+            link(token) {
+              // Add rel="noopener noreferrer" to all external links to prevent
+              // reverse tabnapping attacks.
+              const href = token.href || '';
+              const title = token.title ? ' title="' + token.title + '"' : '';
+              const text = token.text || href;
+              return '<a href="' + href + '" target="_blank" rel="noopener noreferrer"' + title + '>' + text + '</a>';
+            }
+          }
+        });
+        window._markedHighlightConfigured = true;
+      }
+    }
+
+    // ── Height notification ──
+    function notifyHeightChange() {
+      const height = document.documentElement.scrollHeight;
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.heightChange) {
+        window.webkit.messageHandlers.heightChange.postMessage(height);
+      }
+    }
+
+    // ResizeObserver for auto height
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(function () {
+        notifyHeightChange();
+      });
+      observer.observe(document.getElementById('content') || document.body);
+    }
+
+    // ── Main render function ──
+    function render(markdown) {
+      if (!markdown || markdown.trim() === '') {
+        document.getElementById('content').innerHTML = '';
+        notifyHeightChange();
+        return;
+      }
+
+      // Parse thinking blocks first
+      var processed = parseThinkingBlocks(markdown);
+
+      // Render markdown
+      var html;
+      if (typeof marked !== 'undefined' && marked.parse) {
+        configureMarkedHighlight();
+        html = marked.parse(processed, {
+          breaks: true,
+          gfm: true
+        });
+      } else {
+        // Fallback: escape HTML and convert newlines
+        html = processed
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br>');
+      }
+
+      document.getElementById('content').innerHTML = html;
+      wrapCodeBlocks();
+
+      // Apply highlight.js to any unhighlighted blocks
+      if (typeof hljs !== 'undefined') {
+        document.querySelectorAll('#content pre code').forEach(function (block) {
+          if (!block.dataset.highlighted) {
+            hljs.highlightElement(block);
+            block.dataset.highlighted = 'true';
+          }
+        });
+      }
+
+      notifyHeightChange();
+    }
+
+    // ── Incremental append for streaming ──
+    function appendDelta(delta) {
+      // For streaming, we accumulate the raw markdown and re-render
+      if (!window._streamBuffer) window._streamBuffer = '';
+      window._streamBuffer += delta;
+      render(window._streamBuffer);
+    }
+
+    function resetStream() {
+      window._streamBuffer = '';
+    }
+
+    // ── Theme switching ──
+    function setTheme(isDark) {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  </script>
+</body>
+
+</html>

@@ -240,7 +240,11 @@
             "OBJ_338",
             "OBJ_340",
             "OBJ_342",
-            "OBJ_344"
+            "OBJ_344",
+            "OBJ_349",
+            "OBJ_350",
+            "OBJ_355",
+            "OBJ_357"
          );
       };
       "OBJ_106" = {
@@ -1597,6 +1601,7 @@
       "OBJ_56" = {
          isa = "PBXGroup";
          children = (
+            "OBJ_348",
             "OBJ_57",
             "OBJ_58",
             "OBJ_61",
@@ -1632,6 +1637,77 @@
       "OBJ_338" = {
          isa = "PBXBuildFile";
          fileRef = "OBJ_337";
+      };
+      "OBJ_345" = {
+         isa = "PBXFileReference";
+         path = "ChatMarkdownWebView.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_346" = {
+         isa = "PBXFileReference";
+         path = "ChatMessageActions.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_347" = {
+         isa = "PBXFileReference";
+         path = "chat-message.html";
+         sourceTree = "<group>";
+      };
+      "OBJ_348" = {
+         isa = "PBXGroup";
+         children = (
+            "OBJ_345",
+            "OBJ_346",
+            "OBJ_353"
+         );
+         name = "Chat";
+         path = "Chat";
+         sourceTree = "<group>";
+      };
+      "OBJ_349" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_345";
+      };
+      "OBJ_350" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_346";
+      };
+      "OBJ_351" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_347";
+      };
+      "OBJ_352" = {
+         isa = "PBXResourcesBuildPhase";
+         files = (
+            "OBJ_351"
+         );
+      };
+      "OBJ_353" = {
+         isa = "PBXGroup";
+         children = (
+            "OBJ_347"
+         );
+         name = "Resources";
+         path = "Resources";
+         sourceTree = "<group>";
+      };
+      "OBJ_354" = {
+         isa = "PBXFileReference";
+         path = "AgentMarkdownText.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_355" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_354";
+      };
+      "OBJ_356" = {
+         isa = "PBXFileReference";
+         path = "AgentTaskChecklist.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_357" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_356";
       };
       "OBJ_59" = {
          isa = "PBXFileReference";
@@ -1699,7 +1775,9 @@
             "OBJ_324",
             "OBJ_330",
             "OBJ_335",
-            "OBJ_339"
+            "OBJ_339",
+            "OBJ_354",
+            "OBJ_356"
          );
          name = "Stage";
          path = "Stage";
@@ -1964,6 +2042,7 @@
          buildConfigurationList = "OBJ_102";
          buildPhases = (
             "OBJ_105",
+            "OBJ_352",
             "OBJ_166"
          );
          dependencies = (

@@ -47,6 +47,16 @@ private struct PreviewDaemonClient: DaemonQuerying {
         DaemonCommandResult(threadId: nil, projectId: nil, addedCount: nil, assistantMessage: nil, reportDraft: nil)
     }
 
+    func addCreationMessageStreaming(threadID _: String, content _: String) -> CreationStreamingHandle {
+        let handle = CreationStreamingHandle(cancelHandle: CancellableSocket())
+        handle.stream = AsyncStream { continuation in
+            continuation.yield(.delta("Preview streaming response"))
+            continuation.yield(.done(DaemonCommandResult(threadId: nil, projectId: nil, addedCount: nil, assistantMessage: "Preview streaming response", reportDraft: nil)))
+            continuation.finish()
+        }
+        return handle
+    }
+
     func addCreationMaterials(threadID _: String, paths _: [String]) async throws {}
 
     func confirmFeasibility(threadID _: String) async throws -> DaemonCommandResult {
