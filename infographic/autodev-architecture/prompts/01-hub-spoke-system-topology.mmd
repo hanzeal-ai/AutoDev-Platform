@@ -1,0 +1,48 @@
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1e3a5f', 'primaryTextColor': '#e0f0ff', 'primaryBorderColor': '#4a9eff', 'lineColor': '#4a9eff', 'secondaryColor': '#0d2137', 'tertiaryColor': '#0a1628', 'background': '#0a1628', 'mainBkg': '#0d2137', 'nodeBorder': '#4a9eff', 'clusterBkg': '#0d2137', 'clusterBorder': '#2a6aaa', 'titleColor': '#7ec8ff', 'edgeLabelBackground': '#0a1628', 'fontFamily': 'monospace'}}}%%
+graph LR
+    subgraph MacApp["  macOS App  Swift / SwiftUI  "]
+        direction TB
+        VIEWS["🖥️ SwiftUI Views\n─────────────\nShellView\nProjectDetailPage\nCreationPage"]
+        VM["⚙️ ShellViewModel\n─────────────\n@MainActor\nObservableObject\nShellViewState"]
+        DC["📡 DaemonClient\n─────────────\nAF_UNIX Socket\nIPCRequestEnvelope\nAsyncStream"]
+        VIEWS --> VM --> DC
+    end
+
+    subgraph RustDaemon["  Rust Core Daemon  autodev-daemon  "]
+        direction TB
+        SERVER["🔌 Socket Server\n─────────────\nper-client threads\nwrite_envelope\nstreaming branch"]
+        ROUTER["🔀 Router\n─────────────\ndispatch_query\ndispatch_command\nis_streaming_cmd"]
+        STORE["🗄️ Store\n─────────────\nprojects / threads\nmessages / reports\nartifacts / events"]
+        AICLIENT["🤖 AI Worker Client\n─────────────\nHTTP + SSE\nrequest_chat_stream\nrequest_stage_gen"]
+        SERVER --> ROUTER
+        ROUTER --> STORE
+        ROUTER --> AICLIENT
+    end
+
+    subgraph PythonWorker["  Python AI Worker  FastAPI · LangGraph  "]
+        direction TB
+        FASTAPI["⚡ FastAPI :9720\n─────────────\n/generate/chat\n/generate/chat/stream\n/generate/stage"]
+        LANGGRAPH["🧠 LangGraph Graphs\n─────────────\nprd · development\nchat · report · stage"]
+        SSE["📶 SSE Stream\n─────────────\nevent: delta\nevent: result\nevent: error"]
+        FASTAPI --> LANGGRAPH --> SSE
+    end
+
+    subgraph Storage["  本地存储  "]
+        direction TB
+        DB[("📦 SQLite WAL\napp.db\n─────────────\nprojects\nstage_events\nstage_artifacts")]
+        BLOBS[("📁 Blob Store\nblobs/\n─────────────\nmaterials\nartifacts\nsnapshots")]
+    end
+
+    DEEPSEEK["☁️ DeepSeek API\n─────────────\ndeepseek-chat\ndeepseek-reasoner\nStreaming SSE"]
+
+    DC <-->|"Unix Domain Socket\n行分隔 JSON 信封\nschema_version=1"| SERVER
+    AICLIENT <-->|"HTTP + SSE\nlocalhost:9720\nasyncio.timeout=130s"| FASTAPI
+    STORE --- DB
+    STORE --- BLOBS
+    LANGGRAPH -->|"SSE token stream\nDeepSeek API Key"| DEEPSEEK
+
+    style MacApp fill:#0d2137,stroke:#4a9eff,color:#e0f0ff
+    style RustDaemon fill:#0d2137,stroke:#ff8c42,color:#e0f0ff
+    style PythonWorker fill:#0d2137,stroke:#42ff8c,color:#e0f0ff
+    style Storage fill:#0d2137,stroke:#9b59b6,color:#e0f0ff
+    style DEEPSEEK fill:#1a0d37,stroke:#9b59b6,color:#e0f0ff
