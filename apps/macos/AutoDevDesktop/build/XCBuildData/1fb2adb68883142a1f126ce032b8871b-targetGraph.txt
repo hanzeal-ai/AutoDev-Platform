@@ -1,2 +1,0 @@
-Target dependency graph (1 target)
-AutoDevDesktop in AutoDevDesktop, no dependencies
