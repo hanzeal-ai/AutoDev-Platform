@@ -16,6 +16,17 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(DeliveryLifecycleStage.allCases.count, 7)
     }
 
+    func testDeliveryLifecycleStageSubStepsIncludeWorkflowReviewGates() {
+        XCTAssertEqual(
+            DeliveryLifecycleStage.prd.subSteps.map(\.key),
+            ["prd", "prd_review"]
+        )
+        XCTAssertEqual(
+            DeliveryLifecycleStage.development.subSteps.map(\.key),
+            ["task_breakdown", "coding", "code_review", "summary"]
+        )
+    }
+
     // MARK: - ProjectStatus
 
     func testProjectStatusRawValues() {

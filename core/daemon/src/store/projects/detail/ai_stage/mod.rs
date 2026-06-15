@@ -50,6 +50,10 @@ fn request_and_persist_stage_ai_content(
     feasibility: Option<&Value>,
     _feedback: Option<&str>,
 ) -> StoreResult<bool> {
+    if matches!(stage, "prd" | "development") {
+        return request_via_workflow(store, run_id, project_id, project_name, stage, feasibility);
+    }
+
     logger::info("stage_ai: routing through AI Worker (LangGraph)");
     request_via_worker(
         store,
@@ -60,6 +64,111 @@ fn request_and_persist_stage_ai_content(
         defaults,
         feasibility,
     )
+}
+
+fn request_via_workflow(
+    store: &Store,
+    run_id: &str,
+    project_id: &str,
+    project_name: &str,
+    stage: &str,
+    feasibility: Option<&Value>,
+) -> StoreResult<bool> {
+    insert_stage_event(
+        store,
+        project_id,
+        stage,
+        "系统：启动统一 Workflow",
+        "已切换到 Python 统一 workflow，包含需求澄清、可行性报告、PRD、需求评审、研发计划、编码、代码评审与完成总结。",
+    )?;
+    upsert_ai_run(
+        store,
+        run_id,
+        project_id,
+        stage,
+        "waiting_first_delta",
+        None,
+    )?;
+
+    let workflow_id = project_id;
+    let status = worker::request_workflow_status(workflow_id).unwrap_or_else(|_| Value::Null);
+    let workflow_state = if status.as_object().map(|obj| obj.is_empty()).unwrap_or(true) {
+        worker::request_workflow_start(project_id, project_name, feasibility)
+    } else {
+        worker::request_workflow_resume(workflow_id)
+    };
+
+    let workflow_state = match workflow_state {
+        Ok(value) => value,
+        Err(reason) => {
+            upsert_ai_run(store, run_id, project_id, stage, "failed", Some(&reason))?;
+            insert_stage_event(
+                store,
+                project_id,
+                stage,
+                "统一 Workflow 执行失败",
+                &format!("AI Worker 请求失败：{}", reason),
+            )?;
+            logger::error_fields(
+                "ai_worker workflow failed",
+                &[
+                    ("project_id", project_id.to_string()),
+                    ("stage", stage.to_string()),
+                    ("reason", reason),
+                ],
+            );
+            return Ok(false);
+        }
+    };
+
+    persist_workflow_outputs(store, project_id, &workflow_state)?;
+    insert_stage_event(
+        store,
+        project_id,
+        stage,
+        "统一 Workflow 已写入结果",
+        "PRD、需求评审、研发计划、编码结果、代码评审与完成总结已写入项目阶段数据。",
+    )?;
+    upsert_ai_run(store, run_id, project_id, stage, "completed", None)?;
+    Ok(true)
+}
+
+fn persist_workflow_outputs(
+    store: &Store,
+    project_id: &str,
+    workflow_state: &Value,
+) -> StoreResult<()> {
+    if let Some(prd) = workflow_state.get("prd_result") {
+        normalizer::persist_prd_content(store, project_id, prd)?;
+    }
+    if let Some(review) = workflow_state.get("prd_review_result") {
+        normalizer::persist_workflow_review(
+            store,
+            project_id,
+            "prd:prd_review",
+            "需求评审",
+            review,
+        )?;
+    }
+    if let Some(plan) = workflow_state.get("development_plan") {
+        normalizer::persist_development_task_breakdown(store, project_id, plan)?;
+    }
+    if let Some(coding) = workflow_state.get("coding_result") {
+        normalizer::persist_development_coding(store, project_id, coding)?;
+    }
+    if let Some(review) = workflow_state.get("code_review_result") {
+        normalizer::persist_workflow_review(
+            store,
+            project_id,
+            "development:code_review",
+            "代码评审",
+            review,
+        )?;
+    }
+    if let Some(summary) = workflow_state.get("workflow_summary") {
+        normalizer::persist_workflow_summary(store, project_id, summary)?;
+    }
+    Ok(())
 }
 
 /// Route stage generation through the Python AI worker (LangGraph).

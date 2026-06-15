@@ -45,10 +45,17 @@ enum DeliveryLifecycleStage: String, CaseIterable, Identifiable {
         switch self {
         case .feasibility:
             return [("clarification", "需求澄清"), ("report", "可行性报告")]
+        case .prd:
+            return [("prd", "PRD 生成"), ("prd_review", "需求评审")]
         case .ui:
             return [("page_map", "页面地图"), ("interaction", "交互稿")]
         case .development:
-            return [("task_breakdown", "任务拆分"), ("coding", "编码实现")]
+            return [
+                ("task_breakdown", "任务拆解"),
+                ("coding", "编码实现"),
+                ("code_review", "代码评审"),
+                ("summary", "完成总结")
+            ]
         case .testing:
             return [("test_plan", "测试计划"), ("quality_report", "质量报告")]
         default:

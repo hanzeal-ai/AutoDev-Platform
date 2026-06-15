@@ -86,21 +86,21 @@ impl Store {
                 let _ = done_tx.send(());
             });
 
-            // Timeout watchdog: 5 minutes
-            const AI_TIMEOUT: Duration = Duration::from_secs(300);
+            // Unified workflow can run PRD, review, planning, coding, and review loops.
+            const AI_TIMEOUT: Duration = Duration::from_secs(900);
             if done_rx.recv_timeout(AI_TIMEOUT).is_err() {
                 logger::error_fields(
                     "stage agent timeout",
                     &[
                         ("project_id", pid_watchdog.clone()),
                         ("stage", stage_watchdog.clone()),
-                        ("timeout_secs", "300".to_string()),
+                        ("timeout_secs", "900".to_string()),
                     ],
                 );
                 if let Ok(store) = Store::open(&watchdog_paths) {
                     let _ = store.conn.execute(
                         "UPDATE stage_ai_runs SET status = 'failed', error_message = ?1 WHERE id = ?2",
-                        rusqlite::params!["AI 生成超时（5分钟）", run_id_for_watchdog],
+                        rusqlite::params!["AI 生成超时（15分钟）", run_id_for_watchdog],
                     );
                 }
             }

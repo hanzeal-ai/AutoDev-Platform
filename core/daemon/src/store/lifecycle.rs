@@ -2,7 +2,6 @@
 ///
 /// All stage-related logic (progression, labels, progress, goals) is centralized here
 /// to eliminate string-based matching scattered across the codebase.
-
 use super::StageDefaults;
 
 /// The ordered lifecycle stages of a project.
@@ -133,22 +132,16 @@ impl LifecycleStage {
     /// Stages without sub-steps return an empty slice.
     pub(crate) fn sub_steps(&self) -> &'static [(&'static str, &'static str)] {
         match self {
-            Self::Feasibility => &[
-                ("clarification", "需求澄清"),
-                ("report", "可行性报告"),
-            ],
-            Self::Ui => &[
-                ("page_map", "页面地图"),
-                ("interaction", "交互稿"),
-            ],
+            Self::Feasibility => &[("clarification", "需求澄清"), ("report", "可行性报告")],
+            Self::Prd => &[("prd", "PRD 生成"), ("prd_review", "需求评审")],
+            Self::Ui => &[("page_map", "页面地图"), ("interaction", "交互稿")],
             Self::Development => &[
-                ("task_breakdown", "任务拆分"),
-                ("coding", "研发"),
+                ("task_breakdown", "任务拆解"),
+                ("coding", "编码实现"),
+                ("code_review", "代码评审"),
+                ("summary", "完成总结"),
             ],
-            Self::Testing => &[
-                ("test_plan", "测试计划"),
-                ("quality_report", "质量报告"),
-            ],
+            Self::Testing => &[("test_plan", "测试计划"), ("quality_report", "质量报告")],
             _ => &[],
         }
     }
@@ -193,6 +186,27 @@ mod tests {
     #[test]
     fn maintenance_is_terminal() {
         assert!(LifecycleStage::Maintenance.next().is_none());
+    }
+
+    #[test]
+    fn prd_sub_steps_include_review_gate() {
+        assert_eq!(
+            LifecycleStage::Prd.sub_steps(),
+            &[("prd", "PRD 生成"), ("prd_review", "需求评审")]
+        );
+    }
+
+    #[test]
+    fn development_sub_steps_include_code_review_loop_and_summary() {
+        assert_eq!(
+            LifecycleStage::Development.sub_steps(),
+            &[
+                ("task_breakdown", "任务拆解"),
+                ("coding", "编码实现"),
+                ("code_review", "代码评审"),
+                ("summary", "完成总结"),
+            ]
+        );
     }
 
     #[test]

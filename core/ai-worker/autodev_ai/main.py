@@ -54,7 +54,12 @@ _dev_graph = build_development_graph()
 _coding_graph = build_coding_graph()
 
 
-async def _sse_stream_graph(graph, initial_state: dict, agent_node: str, error_label: str):
+async def _sse_stream_graph(
+    graph,
+    initial_state: StageState | PRDState | DevState | CodingState,
+    agent_node: str,
+    error_label: str,
+):
     """Shared SSE streaming logic for all LangGraph graphs."""
     last_deltas_len = 0
     final_result = None

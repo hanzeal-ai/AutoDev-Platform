@@ -139,10 +139,7 @@ where
             Err(_) => continue,
         };
 
-        let kind = event
-            .get("kind")
-            .and_then(Value::as_str)
-            .unwrap_or("");
+        let kind = event.get("kind").and_then(Value::as_str).unwrap_or("");
 
         match kind {
             "delta" => {
@@ -210,15 +207,12 @@ pub(crate) fn request_report_generation(
             reason
         })?;
 
-    let text = response.into_string().map_err(|err| {
-        format!("读取 AI Worker report 响应失败: {err}")
-    })?;
+    let text = response
+        .into_string()
+        .map_err(|err| format!("读取 AI Worker report 响应失败: {err}"))?;
 
-    serde_json::from_str(&text).map_err(|err| {
-        format!("解析 AI Worker report JSON 失败: {err}")
-    })
+    serde_json::from_str(&text).map_err(|err| format!("解析 AI Worker report JSON 失败: {err}"))
 }
-
 
 /// Request a chat clarification turn from the Python worker.
 pub(crate) fn request_chat_clarification(
@@ -256,13 +250,11 @@ pub(crate) fn request_chat_clarification(
             reason
         })?;
 
-    let text = response.into_string().map_err(|err| {
-        format!("读取 AI Worker chat 响应失败: {err}")
-    })?;
+    let text = response
+        .into_string()
+        .map_err(|err| format!("读取 AI Worker chat 响应失败: {err}"))?;
 
-    serde_json::from_str(&text).map_err(|err| {
-        format!("解析 AI Worker chat JSON 失败: {err}")
-    })
+    serde_json::from_str(&text).map_err(|err| format!("解析 AI Worker chat JSON 失败: {err}"))
 }
 
 /// Request a streaming chat clarification turn from the Python worker via SSE.
@@ -365,4 +357,128 @@ where
     }
 
     result_value.ok_or_else(|| "AI Worker chat SSE 流结束但未返回结构化结果".to_string())
+}
+
+pub(crate) fn request_workflow_status(workflow_id: &str) -> StoreResult<Value> {
+    post_worker_json(
+        "/workflow/status",
+        json!({ "workflow_id": workflow_id }),
+        Duration::from_secs(30),
+        "workflow status",
+    )
+}
+
+pub(crate) fn request_workflow_resume(workflow_id: &str) -> StoreResult<Value> {
+    post_worker_json(
+        "/workflow/resume",
+        json!({ "workflow_id": workflow_id }),
+        Duration::from_secs(900),
+        "workflow resume",
+    )
+}
+
+pub(crate) fn request_workflow_start(
+    project_id: &str,
+    project_name: &str,
+    feasibility: Option<&Value>,
+) -> StoreResult<Value> {
+    post_worker_json(
+        "/workflow/start",
+        workflow_start_body(project_id, project_name, feasibility),
+        Duration::from_secs(900),
+        "workflow start",
+    )
+}
+
+fn post_worker_json(
+    path: &str,
+    body: Value,
+    timeout_read: Duration,
+    operation: &str,
+) -> StoreResult<Value> {
+    let url = format!("{}{}", worker_base_url(), path);
+    let agent = make_agent(timeout_read);
+    let response = agent
+        .post(&url)
+        .set("Content-Type", "application/json")
+        .send_json(body)
+        .map_err(|err| format!("AI Worker {operation} 请求失败: {err}"))?;
+    let text = response
+        .into_string()
+        .map_err(|err| format!("读取 AI Worker {operation} 响应失败: {err}"))?;
+    serde_json::from_str(&text)
+        .map_err(|err| format!("解析 AI Worker {operation} JSON 失败: {err}"))
+}
+
+fn workflow_start_body(project_id: &str, project_name: &str, feasibility: Option<&Value>) -> Value {
+    let report_draft = feasibility
+        .and_then(|v| v.get("report_draft"))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let thread_id = feasibility
+        .and_then(|v| v.get("thread_id"))
+        .and_then(Value::as_str)
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(project_id);
+    let user_message = report_draft
+        .get("problem_definition")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            report_draft
+                .get("feasibility_conclusion")
+                .and_then(Value::as_str)
+        })
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(project_name);
+    let materials = feasibility
+        .and_then(|v| v.get("materials"))
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+
+    json!({
+        "workflow_id": project_id,
+        "thread_id": thread_id,
+        "project_id": project_id,
+        "project_name": project_name,
+        "user_message": user_message,
+        "draft": report_draft,
+        "messages": [],
+        "materials": materials,
+    })
+}
+
+#[cfg(test)]
+mod workflow_tests {
+    use super::*;
+
+    #[test]
+    fn workflow_start_body_reuses_existing_thread_and_report_draft() {
+        let feasibility = json!({
+            "thread_id": "thread-1",
+            "report_draft": {
+                "project_name": "Demo",
+                "problem_definition": "Build a tool"
+            },
+            "materials": [{"name": "spec.md"}]
+        });
+
+        let body = workflow_start_body("project-1", "Demo", Some(&feasibility));
+
+        assert_eq!(body["workflow_id"], "project-1");
+        assert_eq!(body["thread_id"], "thread-1");
+        assert_eq!(body["user_message"], "Build a tool");
+        assert_eq!(body["draft"]["project_name"], "Demo");
+        assert_eq!(body["materials"][0]["name"], "spec.md");
+    }
+
+    #[test]
+    fn workflow_start_body_falls_back_to_project_context() {
+        let body = workflow_start_body("project-1", "Demo", None);
+
+        assert_eq!(body["workflow_id"], "project-1");
+        assert_eq!(body["thread_id"], "project-1");
+        assert_eq!(body["user_message"], "Demo");
+        assert!(body["draft"].as_object().unwrap().is_empty());
+        assert!(body["materials"].as_array().unwrap().is_empty());
+    }
 }

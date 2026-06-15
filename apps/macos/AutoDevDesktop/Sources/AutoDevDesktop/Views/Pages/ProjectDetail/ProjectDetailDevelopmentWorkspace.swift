@@ -7,6 +7,10 @@ extension ProjectDetailPage {
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
             if activeSubStep == "coding" {
                 developmentCodingContent(detail: detail)
+            } else if activeSubStep == "code_review" {
+                developmentCodeReviewContent(detail: detail)
+            } else if activeSubStep == "summary" {
+                developmentSummaryContent(detail: detail)
             } else {
                 developmentTaskBreakdownContent(detail: detail)
             }
@@ -121,6 +125,87 @@ extension ProjectDetailPage {
 
         stageModule("代码执行单元", when: !workUnits.isEmpty) {
             DevelopmentWorkUnitBoard(viewModel: viewModel, units: workUnits)
+        }
+
+        stageModule("阶段产物", when: !outputs.isEmpty) {
+            StageArtifactListView(viewModel: viewModel, items: outputs)
+        }
+    }
+
+    @ViewBuilder
+    private func developmentCodeReviewContent(detail: DeliveryExecutionDetail?) -> some View {
+        let issues = detail?.stepProgress ?? []
+        let changes = detail?.eventFlow ?? []
+        let risks = detail?.riskItems ?? []
+        let outputs = detail?.outputArtifacts ?? []
+        let workUnits = DevelopmentWorkUnitPresenter.displayUnits(for: detail)
+
+        stageModule("评审结论", when: !(detail?.objective.isEmpty ?? true)) {
+            Text(detail?.objective ?? "")
+                .font(.subheadline)
+                .foregroundColor(.primary)
+        }
+
+        stageModule("评审状态", when: !(detail?.inputContexts.isEmpty ?? true)) {
+            StageBulletsView(items: detail?.inputContexts ?? [])
+        }
+
+        stageModule("评审问题", when: !issues.isEmpty) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(issues) { step in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(devStepColor(step.status))
+                            .frame(width: 8, height: 8)
+                        Text(step.title)
+                            .font(.subheadline)
+                            .lineLimit(2)
+                    }
+                }
+            }
+        }
+
+        stageModule("必要修改", when: !changes.isEmpty || !risks.isEmpty) {
+            StageBulletsView(items: changes.isEmpty ? risks : changes)
+        }
+
+        stageModule("评审执行单元", when: !workUnits.isEmpty) {
+            DevelopmentWorkUnitBoard(viewModel: viewModel, units: workUnits)
+        }
+
+        stageModule("阶段产物", when: !outputs.isEmpty) {
+            StageArtifactListView(viewModel: viewModel, items: outputs)
+        }
+    }
+
+    @ViewBuilder
+    private func developmentSummaryContent(detail: DeliveryExecutionDetail?) -> some View {
+        let steps = detail?.stepProgress ?? []
+        let outputs = detail?.outputArtifacts ?? []
+
+        stageModule("流程总结", when: !(detail?.objective.isEmpty ?? true)) {
+            Text(detail?.objective ?? "")
+                .font(.subheadline)
+                .foregroundColor(.primary)
+        }
+
+        stageModule("评审轮次", when: !(detail?.inputContexts.isEmpty ?? true)) {
+            StageBulletsView(items: detail?.inputContexts ?? [])
+        }
+
+        stageModule("完成项", when: !steps.isEmpty) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(steps) { step in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(devStepColor(step.status))
+                            .frame(width: 8, height: 8)
+                        Text(step.title)
+                            .font(.subheadline)
+                            .lineLimit(2)
+                    }
+                }
+            }
         }
 
         stageModule("阶段产物", when: !outputs.isEmpty) {
