@@ -12,11 +12,11 @@ import json
 import logging
 from typing import TypedDict
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
 from ..config import ModelConfig
+from ..llm import create_llm
 from ..retry import retry_async
 from ..models import StageContext, StageResult, StepProgress, WorkUnit
 from ..prompts import (
@@ -26,6 +26,7 @@ from ..prompts import (
     SYNTHESIZER_SYSTEM,
     synthesizer_user_prompt,
 )
+from ..tracing import build_trace_config
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +62,7 @@ async def agent_node(state: StageState) -> dict:
 
     feasibility_text = json.dumps(ctx.feasibility or {}, ensure_ascii=False)
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=1800,
-        streaming=True,
-    )
+    llm = create_llm(cfg, max_tokens=1800, streaming=True)
 
     messages = [
         SystemMessage(content=agent_system_prompt(ctx.stage)),
@@ -84,7 +78,10 @@ async def agent_node(state: StageState) -> dict:
         nonlocal full_reply, deltas
         full_reply = ""
         deltas = []
-        async for chunk in llm.astream(messages):
+        async for chunk in llm.astream(
+            messages,
+            config=build_trace_config(f"{ctx.stage}_agent", "stage", ctx),
+        ):
             delta = chunk.content
             if delta:
                 full_reply += delta
@@ -119,14 +116,7 @@ async def synthesizer_node(state: StageState) -> dict:
         "work_units": ctx.work_units,
     }, ensure_ascii=False)
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=1200,
-        model_kwargs={"response_format": {"type": "json_object"}},
-    )
+    llm = create_llm(cfg, max_tokens=1200, json_mode=True)
 
     messages = [
         SystemMessage(content=SYNTHESIZER_SYSTEM),
@@ -135,7 +125,12 @@ async def synthesizer_node(state: StageState) -> dict:
         )),
     ]
 
-    response = await retry_async(lambda: llm.ainvoke(messages))
+    response = await retry_async(
+        lambda: llm.ainvoke(
+            messages,
+            config=build_trace_config(f"{ctx.stage}_synthesizer", "stage", ctx),
+        )
+    )
     raw_text = response.content
 
     try:

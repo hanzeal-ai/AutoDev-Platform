@@ -8,12 +8,13 @@ from __future__ import annotations
 import json
 import logging
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..config import ModelConfig
+from ..llm import create_llm
 from ..models import FeasibilityReport, ReportContext
 from ..prompts import REPORT_SYSTEM, report_user_prompt
+from ..tracing import build_trace_config
 
 logger = logging.getLogger(__name__)
 
@@ -45,21 +46,17 @@ async def generate_report(ctx: ReportContext, cfg: ModelConfig) -> FeasibilityRe
             lines.append(f"- {i}. {name} | {type_hint} | {size_hint} | {status}")
         material_lines = "\n".join(lines)
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=900,
-        model_kwargs={"response_format": {"type": "json_object"}},
-    )
+    llm = create_llm(cfg, max_tokens=900, json_mode=True)
 
     messages = [
         SystemMessage(content=REPORT_SYSTEM),
         HumanMessage(content=report_user_prompt(draft_json, message_lines, material_lines)),
     ]
 
-    response = await llm.ainvoke(messages)
+    response = await llm.ainvoke(
+        messages,
+        config=build_trace_config("feasibility_report", "report", ctx),
+    )
 
     try:
         raw = json.loads(response.content)

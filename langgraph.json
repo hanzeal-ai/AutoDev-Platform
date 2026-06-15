@@ -1,0 +1,13 @@
+{
+  "dependencies": ["./core/ai-worker"],
+  "env": ".env",
+  "graphs": {
+    "chat": "autodev_ai.studio:chat_graph",
+    "report": "autodev_ai.studio:report_graph",
+    "stage": "autodev_ai.studio:stage_graph",
+    "prd": "autodev_ai.studio:prd_graph",
+    "development": "autodev_ai.studio:development_graph",
+    "coding": "autodev_ai.studio:coding_graph",
+    "workflow": "autodev_ai.studio:workflow_graph"
+  }
+}

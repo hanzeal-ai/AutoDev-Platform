@@ -11,11 +11,12 @@ import logging
 from typing import AsyncIterator
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
 from ..config import ModelConfig
+from ..llm import create_llm
 from ..models import ChatContext, ClarificationResult, StreamDelta
 from ..prompts import CHAT_SYSTEM, chat_user_prompt
+from ..tracing import build_trace_config
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +52,7 @@ async def generate_chat(ctx: ChatContext, cfg: ModelConfig) -> ClarificationResu
             lines.append(f"- {i}. {mat.name} | {mat.type_hint} | {mat.size_hint} | {mat.status}")
         material_lines = "\n".join(lines)
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=520,
-        model_kwargs={"response_format": {"type": "json_object"}},
-    )
+    llm = create_llm(cfg, max_tokens=520, json_mode=True)
 
     messages = [
         SystemMessage(content=CHAT_SYSTEM),
@@ -72,7 +66,10 @@ async def generate_chat(ctx: ChatContext, cfg: ModelConfig) -> ClarificationResu
         ),
     ]
 
-    response = await llm.ainvoke(messages)
+    response = await llm.ainvoke(
+        messages,
+        config=build_trace_config("chat_clarification", "chat", ctx),
+    )
 
     try:
         raw = json.loads(response.content)
@@ -159,15 +156,7 @@ async def generate_chat_stream(
             lines.append(f"- {i}. {mat.name} | {mat.type_hint} | {mat.size_hint} | {mat.status}")
         material_lines = "\n".join(lines)
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=520,
-        streaming=True,
-        model_kwargs={"response_format": {"type": "json_object"}},
-    )
+    llm = create_llm(cfg, max_tokens=520, streaming=True, json_mode=True)
 
     messages = [
         SystemMessage(content=CHAT_SYSTEM),
@@ -184,7 +173,10 @@ async def generate_chat_stream(
     full_reply = ""
     extractor = _AssistantReplyExtractor()
     try:
-        async for chunk in llm.astream(messages):
+        async for chunk in llm.astream(
+            messages,
+            config=build_trace_config("chat_clarification_stream", "chat", ctx),
+        ):
             delta = chunk.content
             if delta:
                 full_reply += delta

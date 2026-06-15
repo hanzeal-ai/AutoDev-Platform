@@ -17,6 +17,7 @@ def stage_label(stage: str) -> str:
 
 # ---------- Agent node prompts ----------
 
+
 def agent_system_prompt(stage: str) -> str:
     label = stage_label(stage)
     return (
@@ -117,6 +118,8 @@ def report_user_prompt(
 
 CHAT_SYSTEM = (
     "你是资深产品顾问和架构分析助手，负责用自然语言给出需求的第一版可行性判断。"
+    "你需要先判断用户需求是否合理、是否缺少关键信息、是否具备生成可行性报告的基础，"
+    "再决定是直接生成报告补丁还是只提出一个关键澄清问题。"
     "你的默认目标不是追问，而是先根据行业里常见的技术方案、专业边界和产品方向，"
     "尽可能一次性给出完整的可行性报告、核心方案和风险判断。"
     "只有在确实缺少\u201c无法继续生成\u201d的关键元素时，才在 assistant_reply 里自然地问一句，"
@@ -156,6 +159,7 @@ def chat_user_prompt(
 
 
 # ---------- PRD stage prompts ----------
+
 
 def prd_agent_system_prompt() -> str:
     return (
@@ -229,6 +233,7 @@ def prd_synthesizer_user_prompt(
 
 # ---------- Development stage prompts ----------
 
+
 def dev_architect_system_prompt() -> str:
     return (
         "你是 AI AutoDev 的研发架构 Agent。基于 PRD 的功能清单和技术约束，你需要：\n"
@@ -300,10 +305,36 @@ def dev_synthesizer_user_prompt(
 
 # ---------- Development Coding (sub-step 2) ----------
 
+
+def coding_planner_system_prompt() -> str:
+    return (
+        "你是 AI AutoDev 的 coding planning Agent。仅输出一个 JSON 对象，不要解释、不要 markdown、不要代码块。\n"
+        "你的任务是在生成代码前，先把研发任务拆成有顺序、可执行、可验收的 coding tasks。\n\n"
+        "JSON 字段：\n"
+        "- tasks(array): 每项包含 id(string), title(string), module_id(string), "
+        "depends_on(string[]), target_files(string[]), acceptance_checks(string[]), "
+        "implementation_notes(string)。\n\n"
+        "要求：tasks 按依赖顺序排列；不要把文件正文、密钥、用户原文放进计划；"
+        "acceptance_checks 必须能用于判断该任务是否完成。"
+    )
+
+
+def coding_planner_user_prompt(project_name: str, task_breakdown_text: str) -> str:
+    return (
+        "请先为以下项目生成 coding planning JSON。\n\n"
+        f"项目：{project_name}\n\n"
+        f"任务拆分方案：\n{task_breakdown_text[:6000]}\n\n"
+        "要求：\n"
+        "1. 先做基础结构和数据模型，再做接口/业务逻辑，最后做集成与验证。\n"
+        "2. target_files 只写相对路径，不写文件内容。\n"
+        "3. 每个 task 都要有明确 acceptance_checks。"
+    )
+
+
 def coding_agent_system_prompt() -> str:
     return (
         "你是 AI AutoDev 的编码 Agent。基于任务拆分方案（模块设计、接口契约、脚手架文件），"
-        "你需要为每个模块生成功能实现代码。\n\n"
+        "以及 coding planning 任务清单，按计划顺序为每个模块生成功能实现代码。\n\n"
         "要求：\n"
         "1. 每个模块的核心业务逻辑必须实现，不要只写空壳/接口。\n"
         "2. 代码必须与脚手架文件的结构保持一致（import、类名、函数签名）。\n"
@@ -314,13 +345,18 @@ def coding_agent_system_prompt() -> str:
     )
 
 
-def coding_agent_user_prompt(project_name: str, task_breakdown_text: str) -> str:
+def coding_agent_user_prompt(
+    project_name: str,
+    task_breakdown_text: str,
+    coding_plan_text: str = "[]",
+) -> str:
     return (
         f"请为以下项目生成模块实现代码。\n\n"
         f"项目：{project_name}\n\n"
         f"任务拆分方案：\n{task_breakdown_text[:6000]}\n\n"
+        f"coding planning 任务清单：\n{coding_plan_text[:4000]}\n\n"
         "要求：\n"
-        "1. 按模块逐个生成实现代码文件。\n"
+        "1. 按 coding planning 的顺序逐个完成任务，并在回复里标注任务对应文件。\n"
         "2. 每个文件包含完整的 import、类/函数定义、业务逻辑。\n"
         "3. 接口 handler 要实现请求解析、业务调用、响应构建。\n"
         "4. 模型/数据层要实现 CRUD 基本操作。\n"

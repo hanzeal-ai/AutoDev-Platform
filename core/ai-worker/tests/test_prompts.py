@@ -1,6 +1,8 @@
 from autodev_ai.prompts import (
     stage_label, agent_system_prompt, agent_user_prompt,
     REPORT_SYSTEM, CHAT_SYSTEM, chat_user_prompt,
+    coding_planner_system_prompt,
+    coding_planner_user_prompt,
 )
 
 
@@ -38,9 +40,22 @@ class TestChatPrompts:
         assert "JSON" in CHAT_SYSTEM
         assert "assistant_reply" in CHAT_SYSTEM
         assert "report_patch" in CHAT_SYSTEM
+        assert "需求是否合理" in CHAT_SYSTEM
+        assert "是否缺少关键信息" in CHAT_SYSTEM
 
     def test_chat_user_prompt_includes_context(self):
         prompt = chat_user_prompt("{}", "- msg1", "- mat1", "用户输入")
         assert "用户输入" in prompt
         assert "msg1" in prompt
         assert "mat1" in prompt
+
+
+class TestCodingPrompts:
+    def test_coding_planner_prompts_define_planning_contract(self):
+        system_prompt = coding_planner_system_prompt()
+        user_prompt = coding_planner_user_prompt("项目", "{}")
+
+        assert "planning" in system_prompt.lower()
+        assert "tasks" in system_prompt
+        assert "acceptance_checks" in system_prompt
+        assert "项目" in user_prompt

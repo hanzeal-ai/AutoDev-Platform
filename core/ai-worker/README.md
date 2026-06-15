@@ -33,6 +33,18 @@ pytest
 
 ## 环境变量
 
+项目根目录需要创建本地 `.env` 文件。该文件包含 API key 等敏感信息，不能提交到 Git。
+
+示例：
+
+```bash
+DEEPSEEK_API_KEY=your_deepseek_key
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=your_langsmith_key
+LANGSMITH_PROJECT=autodev
+```
+
 - `DEEPSEEK_API_KEY` — DeepSeek API 密钥（必须）
 - `DEEPSEEK_BASE_URL` — API 地址（默认 https://api.deepseek.com/v1）
 - `DEEPSEEK_MODEL` — 模型名（默认 deepseek-chat）

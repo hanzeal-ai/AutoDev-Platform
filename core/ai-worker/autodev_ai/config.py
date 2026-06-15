@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
+from .tracing import configure_langsmith_tracing
+
 logger = logging.getLogger(__name__)
 
 # Load .env files (project root → user config)
@@ -12,6 +14,7 @@ load_dotenv()
 _user_config = os.path.expanduser("~/.config/autodev/deepseek.env")
 if os.path.exists(_user_config):
     load_dotenv(_user_config)
+configure_langsmith_tracing()
 
 
 @dataclass(frozen=True)

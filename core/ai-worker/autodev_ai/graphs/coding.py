@@ -1,7 +1,7 @@
 """LangGraph coding generation workflow (development sub-step 2).
 
 Graph topology:
-    coding_agent_node (streaming) ──▶ synthesizer_node ──▶ normalizer_node
+    planner_node ──▶ coding_agent_node (streaming) ──▶ synthesizer_node ──▶ normalizer_node
 
 Produces a structured CodingResult with implementation code files.
 """
@@ -12,19 +12,22 @@ import json
 import logging
 from typing import TypedDict
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
 from ..config import ModelConfig
+from ..llm import create_llm
 from ..retry import retry_async
 from ..models import CodingContext, CodingResult, CodeFile
 from ..prompts import (
+    coding_planner_system_prompt,
+    coding_planner_user_prompt,
     coding_agent_system_prompt,
     coding_agent_user_prompt,
     CODING_SYNTHESIZER_SYSTEM,
     coding_synthesizer_user_prompt,
 )
+from ..tracing import build_trace_config
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,7 @@ MAX_CODE_FILES = 30
 class CodingState(TypedDict, total=False):
     context: CodingContext
     config: ModelConfig
+    coding_plan: list[dict]
     coding_reply: str
     deltas: list[str]
     structured: dict
@@ -40,26 +44,49 @@ class CodingState(TypedDict, total=False):
     error: str | None
 
 
-async def coding_agent_node(state: CodingState) -> dict:
-    """Stage 1: streaming coding agent — produces implementation narrative."""
+async def planner_node(state: CodingState) -> dict:
+    """Stage 1: planning — creates ordered coding tasks before implementation."""
     ctx = state["context"]
     cfg = state["config"]
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=4000,
-        streaming=True,
+    task_breakdown_text = json.dumps(ctx.task_breakdown, ensure_ascii=False)
+    llm = create_llm(cfg, max_tokens=1800, json_mode=True)
+
+    messages = [
+        SystemMessage(content=coding_planner_system_prompt()),
+        HumanMessage(content=coding_planner_user_prompt(ctx.project_name, task_breakdown_text)),
+    ]
+
+    response = await retry_async(
+        lambda: llm.ainvoke(
+            messages,
+            config=build_trace_config("coding_planner", "coding", ctx),
+        )
     )
+    raw_text = response.content
+
+    try:
+        raw = json.loads(raw_text)
+    except json.JSONDecodeError:
+        raw = _extract_json_fallback(raw_text) or {}
+
+    return {"coding_plan": _normalize_coding_plan(raw)}
+
+
+async def coding_agent_node(state: CodingState) -> dict:
+    """Stage 2: streaming coding agent — produces implementation narrative."""
+    ctx = state["context"]
+    cfg = state["config"]
+
+    llm = create_llm(cfg, max_tokens=4000, streaming=True)
 
     task_breakdown_text = json.dumps(ctx.task_breakdown, ensure_ascii=False)
+    coding_plan_text = json.dumps(state.get("coding_plan", []), ensure_ascii=False)
 
     messages = [
         SystemMessage(content=coding_agent_system_prompt()),
         HumanMessage(content=coding_agent_user_prompt(
-            ctx.project_name, task_breakdown_text,
+            ctx.project_name, task_breakdown_text, coding_plan_text,
         )),
     ]
 
@@ -70,7 +97,10 @@ async def coding_agent_node(state: CodingState) -> dict:
         nonlocal full_reply, deltas
         full_reply = ""
         deltas = []
-        async for chunk in llm.astream(messages):
+        async for chunk in llm.astream(
+            messages,
+            config=build_trace_config("coding_agent", "coding", ctx),
+        ):
             delta = chunk.content
             if delta:
                 full_reply += delta
@@ -85,7 +115,7 @@ async def coding_agent_node(state: CodingState) -> dict:
 
 
 async def synthesizer_node(state: CodingState) -> dict:
-    """Stage 2: synthesizer — converts coding narrative to structured JSON."""
+    """Stage 3: synthesizer — converts coding narrative to structured JSON."""
     ctx = state["context"]
     cfg = state["config"]
     coding_reply = state.get("coding_reply", "")
@@ -95,14 +125,7 @@ async def synthesizer_node(state: CodingState) -> dict:
 
     task_breakdown_text = json.dumps(ctx.task_breakdown, ensure_ascii=False)
 
-    llm = ChatOpenAI(
-        model=cfg.model,
-        api_key=cfg.api_key,
-        base_url=cfg.base_url,
-        temperature=0.2,
-        max_tokens=4000,
-        model_kwargs={"response_format": {"type": "json_object"}},
-    )
+    llm = create_llm(cfg, max_tokens=4000, json_mode=True)
 
     messages = [
         SystemMessage(content=CODING_SYNTHESIZER_SYSTEM),
@@ -111,7 +134,12 @@ async def synthesizer_node(state: CodingState) -> dict:
         )),
     ]
 
-    response = await retry_async(lambda: llm.ainvoke(messages))
+    response = await retry_async(
+        lambda: llm.ainvoke(
+            messages,
+            config=build_trace_config("coding_synthesizer", "coding", ctx),
+        )
+    )
     raw_text = response.content
 
     try:
@@ -125,7 +153,7 @@ async def synthesizer_node(state: CodingState) -> dict:
 
 
 async def normalizer_node(state: CodingState) -> dict:
-    """Stage 3: normalize and validate the coding result."""
+    """Stage 4: normalize and validate the coding result."""
     raw = state.get("structured", {})
 
     if not raw:
@@ -156,16 +184,73 @@ async def normalizer_node(state: CodingState) -> dict:
 
 def build_coding_graph() -> StateGraph:
     graph = StateGraph(CodingState)
+    graph.add_node("planner", planner_node)
     graph.add_node("coding_agent", coding_agent_node)
     graph.add_node("synthesizer", synthesizer_node)
     graph.add_node("normalizer", normalizer_node)
 
-    graph.add_edge(START, "coding_agent")
+    graph.add_edge(START, "planner")
+    graph.add_edge("planner", "coding_agent")
     graph.add_edge("coding_agent", "synthesizer")
     graph.add_edge("synthesizer", "normalizer")
     graph.add_edge("normalizer", END)
 
     return graph.compile()
+
+
+def _normalize_coding_plan(raw: dict) -> list[dict]:
+    tasks = raw.get("tasks") if isinstance(raw, dict) else None
+    if not isinstance(tasks, list):
+        return [_fallback_coding_task()]
+
+    normalized: list[dict] = []
+    seen_ids: set[str] = set()
+    for index, task in enumerate(tasks[:20], 1):
+        if not isinstance(task, dict):
+            continue
+        task_id = str(task.get("id", "")).strip()[:64] or f"task-{index}"
+        title = str(task.get("title", "")).strip()[:256]
+        if not title or task_id in seen_ids:
+            continue
+        seen_ids.add(task_id)
+        normalized.append({
+            "id": task_id,
+            "title": title,
+            "module_id": str(task.get("module_id", "")).strip()[:64],
+            "depends_on": _string_list(task.get("depends_on"), 12, 64),
+            "target_files": _string_list(task.get("target_files"), 20, 512),
+            "acceptance_checks": _string_list(task.get("acceptance_checks"), 8, 256),
+            "implementation_notes": str(task.get("implementation_notes", "")).strip()[:512],
+        })
+
+    return normalized or [_fallback_coding_task()]
+
+
+def _fallback_coding_task() -> dict:
+    return {
+        "id": "implementation",
+        "title": "按任务拆分方案生成核心实现",
+        "module_id": "",
+        "depends_on": [],
+        "target_files": [],
+        "acceptance_checks": ["生成的文件路径、模块关系和接口契约保持一致"],
+        "implementation_notes": "LLM 未返回有效计划，回退到单步实现。",
+    }
+
+
+def _string_list(raw, limit: int, max_len: int) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    result: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        value = item.strip()[:max_len]
+        if value and value not in result:
+            result.append(value)
+        if len(result) >= limit:
+            break
+    return result
 
 
 def _extract_json_fallback(raw: str) -> dict | None:

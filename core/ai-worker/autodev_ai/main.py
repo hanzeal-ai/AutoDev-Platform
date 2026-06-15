@@ -25,7 +25,10 @@ from .models import (
     ReportContext,
     StageContext,
     StreamDelta,
+    WorkflowResumeContext,
+    WorkflowStartContext,
 )
+from .workflow import get_workflow_status, resume_workflow, start_workflow
 
 # ── Logging setup ──────────────────────────────────────────────────────────────
 # Explicitly set converter = time.localtime on the Formatter base class so that
@@ -298,6 +301,7 @@ async def generate_development_coding(ctx: CodingContext):
             initial_state: CodingState = {
                 "context": ctx,
                 "config": cfg,
+                "coding_plan": [],
                 "coding_reply": "",
                 "deltas": [],
                 "structured": {},
@@ -315,3 +319,37 @@ async def generate_development_coding(ctx: CodingContext):
             }
 
     return EventSourceResponse(event_generator())
+
+
+@app.post("/workflow/start")
+async def workflow_start(ctx: WorkflowStartContext):
+    """Start the unified checkpointed workflow."""
+    try:
+        return await start_workflow(ctx)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="AI 服务不可用")
+    except Exception:
+        logger.error("Workflow start failed: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Workflow 执行失败，请重试")
+
+
+@app.post("/workflow/resume")
+async def workflow_resume(ctx: WorkflowResumeContext):
+    """Resume a workflow from its latest SQLite checkpoint."""
+    try:
+        return await resume_workflow(ctx.workflow_id)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="AI 服务不可用")
+    except Exception:
+        logger.error("Workflow resume failed: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Workflow 恢复失败，请重试")
+
+
+@app.post("/workflow/status")
+async def workflow_status(ctx: WorkflowResumeContext):
+    """Return the latest checkpointed workflow state without advancing it."""
+    try:
+        return await get_workflow_status(ctx.workflow_id)
+    except Exception:
+        logger.error("Workflow status failed: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Workflow 状态读取失败，请重试")

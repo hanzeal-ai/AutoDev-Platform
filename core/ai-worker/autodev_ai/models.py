@@ -329,3 +329,70 @@ class CodingContext(BaseModel):
         if not v:
             raise ValueError("project_name must not be empty")
         return v
+
+
+# ---------- Unified Workflow ----------
+
+class WorkflowStartContext(BaseModel):
+    """Input for the unified AutoDev workflow graph."""
+    workflow_id: str = Field(default="", max_length=128)
+    thread_id: str
+    project_id: str
+    project_name: str = Field(max_length=256)
+    user_message: str = Field(max_length=4096)
+    draft: dict = Field(default_factory=dict)
+    messages: list[ChatMessage] = Field(default_factory=list)
+    materials: list[ChatMaterial] = Field(default_factory=list)
+
+    @field_validator("workflow_id")
+    @classmethod
+    def validate_workflow_id(cls, v: str) -> str:
+        v = v.strip()
+        if v and not ID_PATTERN.match(v):
+            raise ValueError("invalid workflow_id")
+        return v
+
+    @field_validator("thread_id")
+    @classmethod
+    def validate_workflow_thread_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v or not ID_PATTERN.match(v):
+            raise ValueError("invalid thread_id")
+        return v
+
+    @field_validator("project_id")
+    @classmethod
+    def validate_workflow_project_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v or not ID_PATTERN.match(v):
+            raise ValueError("invalid project_id")
+        return v
+
+    @field_validator("project_name")
+    @classmethod
+    def validate_workflow_project_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("project_name must not be empty")
+        return v
+
+    @field_validator("user_message")
+    @classmethod
+    def validate_workflow_user_message(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("user_message must not be empty")
+        return v
+
+
+class WorkflowResumeContext(BaseModel):
+    """Request body for resuming or inspecting a checkpointed workflow."""
+    workflow_id: str = Field(max_length=128)
+
+    @field_validator("workflow_id")
+    @classmethod
+    def validate_resume_workflow_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v or not ID_PATTERN.match(v):
+            raise ValueError("invalid workflow_id")
+        return v

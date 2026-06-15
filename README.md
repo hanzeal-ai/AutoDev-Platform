@@ -71,6 +71,21 @@ open apps/macos/AutoDevDesktop/AutoDevDesktop.xcodeproj
 
 ## Quick Start
 
+### Local environment
+
+Create a local `.env` file before starting the AI worker. This file contains
+private API keys and must not be committed.
+
+Required values:
+
+```bash
+DEEPSEEK_API_KEY=your_deepseek_key
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=your_langsmith_key
+LANGSMITH_PROJECT=autodev
+```
+
 ### Option A: One-command preview
 
 ```bash
