@@ -61,3 +61,16 @@ def test_build_trace_config_uses_safe_tags_and_metadata():
     assert "proj-1" in dumped
     assert "Sensitive Project" not in dumped
     assert "do-not-record" not in dumped
+
+
+def test_build_trace_config_records_prompt_versions_without_content():
+    ctx = ChatContext(thread_id="thread-1", user_message="secret prompt input")
+
+    config = build_trace_config("chat_clarification", "chat", ctx, prompt_keys=["chat.system"])
+
+    metadata = config["metadata"]
+    dumped = repr(metadata)
+    assert metadata["prompt_keys"] == ["chat.system"]
+    assert metadata["prompt_versions"]["chat.system"]
+    assert "assistant_reply" not in dumped
+    assert "secret prompt input" not in dumped

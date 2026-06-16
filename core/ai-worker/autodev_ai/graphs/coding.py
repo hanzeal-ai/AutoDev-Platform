@@ -60,7 +60,12 @@ async def planner_node(state: CodingState) -> dict:
     response = await retry_async(
         lambda: llm.ainvoke(
             messages,
-            config=build_trace_config("coding_planner", "coding", ctx),
+            config=build_trace_config(
+                "coding_planner",
+                "coding",
+                ctx,
+                prompt_keys=["coding.planner.system", "coding.planner.user"],
+            ),
         )
     )
     raw_text = response.content
@@ -99,7 +104,12 @@ async def coding_agent_node(state: CodingState) -> dict:
         deltas = []
         async for chunk in llm.astream(
             messages,
-            config=build_trace_config("coding_agent", "coding", ctx),
+            config=build_trace_config(
+                "coding_agent",
+                "coding",
+                ctx,
+                prompt_keys=["coding.agent.system", "coding.agent.user"],
+            ),
         ):
             delta = chunk.content
             if delta:
@@ -137,7 +147,12 @@ async def synthesizer_node(state: CodingState) -> dict:
     response = await retry_async(
         lambda: llm.ainvoke(
             messages,
-            config=build_trace_config("coding_synthesizer", "coding", ctx),
+            config=build_trace_config(
+                "coding_synthesizer",
+                "coding",
+                ctx,
+                prompt_keys=["coding.synthesizer.system", "coding.synthesizer.user"],
+            ),
         )
     )
     raw_text = response.content

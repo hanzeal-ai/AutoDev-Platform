@@ -4,6 +4,7 @@ from autodev_ai.prompts import (
     coding_planner_system_prompt,
     coding_planner_user_prompt,
 )
+from autodev_ai.prompt_registry import get_prompt, list_prompts, prompt_metadata
 
 
 class TestStageLabel:
@@ -59,3 +60,26 @@ class TestCodingPrompts:
         assert "tasks" in system_prompt
         assert "acceptance_checks" in system_prompt
         assert "项目" in user_prompt
+
+
+class TestPromptRegistry:
+    def test_registry_exposes_versioned_prompts(self):
+        prompts = list_prompts()
+        keys = {prompt.key for prompt in prompts}
+
+        assert "chat.system" in keys
+        assert "coding.planner.system" in keys
+        assert all(prompt.version for prompt in prompts)
+        assert len(keys) == len(prompts)
+
+    def test_registry_content_matches_existing_prompt_exports(self):
+        assert get_prompt("chat.system").content == CHAT_SYSTEM
+        assert get_prompt("report.system").content == REPORT_SYSTEM
+
+    def test_prompt_metadata_excludes_prompt_content(self):
+        metadata = prompt_metadata("chat.system")
+
+        assert metadata["prompt_key"] == "chat.system"
+        assert metadata["prompt_version"]
+        assert "content" not in metadata
+        assert CHAT_SYSTEM not in repr(metadata)

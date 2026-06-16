@@ -68,7 +68,12 @@ async def generate_chat(ctx: ChatContext, cfg: ModelConfig) -> ClarificationResu
 
     response = await llm.ainvoke(
         messages,
-        config=build_trace_config("chat_clarification", "chat", ctx),
+        config=build_trace_config(
+            "chat_clarification",
+            "chat",
+            ctx,
+            prompt_keys=["chat.system", "chat.user"],
+        ),
     )
 
     try:
@@ -175,7 +180,12 @@ async def generate_chat_stream(
     try:
         async for chunk in llm.astream(
             messages,
-            config=build_trace_config("chat_clarification_stream", "chat", ctx),
+            config=build_trace_config(
+                "chat_clarification_stream",
+                "chat",
+                ctx,
+                prompt_keys=["chat.system", "chat.user"],
+            ),
         ):
             delta = chunk.content
             if delta:

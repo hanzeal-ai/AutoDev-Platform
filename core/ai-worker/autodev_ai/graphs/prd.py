@@ -78,7 +78,12 @@ async def agent_node(state: PRDState) -> dict:
         deltas = []
         async for chunk in llm.astream(
             messages,
-            config=build_trace_config("prd_agent", "prd", ctx),
+            config=build_trace_config(
+                "prd_agent",
+                "prd",
+                ctx,
+                prompt_keys=["prd.agent.system", "prd.agent.user"],
+            ),
         ):
             delta = chunk.content
             if delta:
@@ -116,7 +121,12 @@ async def synthesizer_node(state: PRDState) -> dict:
     response = await retry_async(
         lambda: llm.ainvoke(
             messages,
-            config=build_trace_config("prd_synthesizer", "prd", ctx),
+            config=build_trace_config(
+                "prd_synthesizer",
+                "prd",
+                ctx,
+                prompt_keys=["prd.synthesizer.system", "prd.synthesizer.user"],
+            ),
         )
     )
     raw_text = response.content

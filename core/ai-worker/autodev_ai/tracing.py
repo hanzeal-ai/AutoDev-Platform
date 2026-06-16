@@ -6,6 +6,8 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
+from .prompt_registry import prompt_versions
+
 
 def configure_langsmith_tracing() -> None:
     """Apply safe LangSmith defaults after .env has been loaded.
@@ -25,9 +27,18 @@ def configure_langsmith_tracing() -> None:
     os.environ.setdefault("LANGCHAIN_HIDE_OUTPUTS", os.environ["LANGSMITH_HIDE_OUTPUTS"])
 
 
-def build_trace_config(run_name: str, stage: str, context: Any | None = None) -> dict[str, Any]:
+def build_trace_config(
+    run_name: str,
+    stage: str,
+    context: Any | None = None,
+    prompt_keys: list[str] | tuple[str, ...] | str | None = None,
+) -> dict[str, Any]:
     """Build RunnableConfig-compatible trace data without raw request content."""
     metadata = summarize_context(stage, context)
+    keys = _normalize_prompt_keys(prompt_keys)
+    if keys:
+        metadata["prompt_keys"] = keys
+        metadata["prompt_versions"] = prompt_versions(keys)
     return {
         "run_name": run_name,
         "tags": ["ai-worker", stage],
@@ -78,3 +89,22 @@ def summarize_context(stage: str, context: Any | None) -> dict[str, Any]:
 
 def _safe_string(value: str, max_len: int) -> str:
     return value.strip()[:max_len]
+
+
+def _normalize_prompt_keys(prompt_keys: list[str] | tuple[str, ...] | str | None) -> list[str]:
+    if prompt_keys is None:
+        return []
+    if isinstance(prompt_keys, str):
+        raw_keys = [prompt_keys]
+    else:
+        raw_keys = list(prompt_keys)
+    keys: list[str] = []
+    seen: set[str] = set()
+    for key in raw_keys:
+        if not isinstance(key, str):
+            continue
+        normalized = key.strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            keys.append(normalized)
+    return keys

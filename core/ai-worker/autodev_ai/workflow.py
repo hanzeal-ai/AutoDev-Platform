@@ -281,7 +281,12 @@ async def prd_review_node(state: AutoDevWorkflowState) -> dict[str, Any]:
                     )
                 ),
             ],
-            config=build_trace_config("prd_review", "prd_review", ctx),
+            config=build_trace_config(
+                "prd_review",
+                "prd_review",
+                ctx,
+                prompt_keys=["prd_review.system", "prd_review.user"],
+            ),
         )
     )
     review = _parse_review_response(response.content, default_summary="PRD 评审完成")
@@ -382,7 +387,12 @@ async def code_review_node(state: AutoDevWorkflowState) -> dict[str, Any]:
                     )
                 ),
             ],
-            config=build_trace_config("code_review", "code_review", ctx),
+            config=build_trace_config(
+                "code_review",
+                "code_review",
+                ctx,
+                prompt_keys=["code_review.system", "code_review.user"],
+            ),
         )
     )
     review = _parse_review_response(response.content, default_summary="代码评审完成")

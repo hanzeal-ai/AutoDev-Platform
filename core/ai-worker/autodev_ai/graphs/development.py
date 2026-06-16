@@ -82,7 +82,15 @@ async def architect_node(state: DevState) -> dict:
         deltas = []
         async for chunk in llm.astream(
             messages,
-            config=build_trace_config("development_architect", "development", ctx),
+            config=build_trace_config(
+                "development_architect",
+                "development",
+                ctx,
+                prompt_keys=[
+                    "development.architect.system",
+                    "development.architect.user",
+                ],
+            ),
         ):
             delta = chunk.content
             if delta:
@@ -120,7 +128,15 @@ async def synthesizer_node(state: DevState) -> dict:
     response = await retry_async(
         lambda: llm.ainvoke(
             messages,
-            config=build_trace_config("development_synthesizer", "development", ctx),
+            config=build_trace_config(
+                "development_synthesizer",
+                "development",
+                ctx,
+                prompt_keys=[
+                    "development.synthesizer.system",
+                    "development.synthesizer.user",
+                ],
+            ),
         )
     )
     raw_text = response.content

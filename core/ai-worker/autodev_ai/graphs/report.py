@@ -55,7 +55,12 @@ async def generate_report(ctx: ReportContext, cfg: ModelConfig) -> FeasibilityRe
 
     response = await llm.ainvoke(
         messages,
-        config=build_trace_config("feasibility_report", "report", ctx),
+        config=build_trace_config(
+            "feasibility_report",
+            "report",
+            ctx,
+            prompt_keys=["report.system", "report.user"],
+        ),
     )
 
     try:
