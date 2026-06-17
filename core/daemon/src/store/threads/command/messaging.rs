@@ -17,22 +17,9 @@ impl Store {
             )
             .map_err(|err| err.to_string())?;
 
-        let ai_turn = match self.generate_clarification_turn(thread_id, content) {
-            Ok(turn) => turn,
-            Err(err) => {
-                logger::error_fields(
-                    "add_creation_message failed",
-                    &[
-                        ("thread_id", thread_id.to_string()),
-                        ("reason", err.clone()),
-                        ("user_message", content.to_string()),
-                    ],
-                );
-                return Err(err);
-            }
-        };
-        let assistant_message = ai_turn.assistant_message;
-        let report_patch = ai_turn.report_patch;
+        let (project_id, project_title) =
+            self.ensure_workflow_project_for_thread(thread_id, content, now)?;
+        let assistant_message = workflow_started_message(&project_title);
         self.conn
             .execute(
                 "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'ai', ?3, ?4)",
@@ -40,12 +27,13 @@ impl Store {
             )
             .map_err(|err| err.to_string())?;
 
-        self.update_report_from_patch(thread_id, &report_patch, now)?;
         self.touch_thread(thread_id, now)?;
+        self.trigger_creation_workflow(&project_id)?;
         Ok(json!({
             "thread_id": thread_id,
             "assistant_message": assistant_message,
-            "report_draft": self.thread_report_draft(thread_id)?
+            "report_draft": self.thread_report_draft(thread_id)?,
+            "project_id": project_id
         }))
     }
 
@@ -56,7 +44,7 @@ impl Store {
         &self,
         thread_id: &str,
         content: &str,
-        on_delta: F,
+        mut on_delta: F,
     ) -> StoreResult<Value>
     where
         F: FnMut(&str) -> StoreResult<()>,
@@ -83,19 +71,18 @@ impl Store {
             return Err(err.to_string());
         }
 
-        let ai_turn =
-            match self.generate_clarification_turn_streaming(&thread_id, content, on_delta) {
-                Ok(turn) => turn,
+        let (project_id, project_title) =
+            match self.ensure_workflow_project_for_thread(&thread_id, content, user_now) {
+                Ok(project) => project,
                 Err(err) => {
                     logger::error_fields(
-                        "add_creation_message_streaming failed",
+                        "add_creation_message_streaming project setup failed",
                         &[
                             ("thread_id", thread_id.clone()),
                             ("reason", err.clone()),
                             ("user_message", content.to_string()),
                         ],
                     );
-                    // Roll back the user message so the DB stays consistent.
                     let _ = self
                         .conn
                         .execute("ROLLBACK TO SAVEPOINT sp_streaming_msg", []);
@@ -103,12 +90,10 @@ impl Store {
                     return Err(err);
                 }
             };
-
-        let assistant_message = ai_turn.assistant_message;
-        let report_patch = ai_turn.report_patch;
+        let assistant_message = workflow_started_message(&project_title);
 
         // Use a fresh timestamp so the AI message time reflects when
-        // streaming finished, not when the user sent the message.
+        // workflow dispatch finished, not when the user sent the message.
         let ai_now = now_ms();
         let insert_ai = self.conn.execute(
             "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'ai', ?3, ?4)",
@@ -127,13 +112,98 @@ impl Store {
             .execute("RELEASE SAVEPOINT sp_streaming_msg", [])
             .map_err(|err| err.to_string())?;
 
-        self.update_report_from_patch(&thread_id, &report_patch, ai_now)?;
         self.touch_thread(&thread_id, ai_now)?;
+        self.trigger_creation_workflow(&project_id)?;
+        let _ = on_delta("统一 workflow 已启动，将依次生成可行性分析、PRD、研发计划、代码结果与评审。");
         Ok(json!({
             "thread_id": thread_id,
             "assistant_message": assistant_message,
-            "report_draft": self.thread_report_draft(&thread_id)?
+            "report_draft": self.thread_report_draft(&thread_id)?,
+            "project_id": project_id
         }))
+    }
+
+    fn ensure_workflow_project_for_thread(
+        &self,
+        thread_id: &str,
+        user_message: &str,
+        now: i64,
+    ) -> StoreResult<(String, String)> {
+        let linked: Option<(String, String)> = self
+            .conn
+            .query_row(
+                r#"
+SELECT p.id, p.title
+FROM creation_threads t
+JOIN projects p ON p.id = t.linked_project_id
+WHERE t.id = ?1
+"#,
+                params![thread_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|err| err.to_string())?;
+        if let Some((project_id, project_title)) = linked {
+            self.seed_workflow_report_draft(thread_id, &project_title, user_message, now)?;
+            return Ok((project_id, project_title));
+        }
+
+        let project_id = Uuid::new_v4().to_string();
+        let project_title = workflow_project_title(user_message);
+        self.seed_workflow_report_draft(thread_id, &project_title, user_message, now)?;
+        self.conn
+            .execute(
+                r#"
+INSERT INTO projects (
+  id, title, current_phase, lifecycle_stage, progress, current_goal, next_action,
+  risk, block_reason, status, owner, updated_at_ms, created_at_ms
+) VALUES (?1, ?2, 'Workflow', 'development', 0.05, ?3, ?4, 'medium', NULL, 'running', '系统代理', ?5, ?6)
+"#,
+                params![
+                    project_id,
+                    project_title,
+                    "统一 workflow 已启动，等待阶段产物生成",
+                    "等待 workflow 写入阶段产物",
+                    now,
+                    now
+                ],
+            )
+            .map_err(|err| err.to_string())?;
+        self.conn
+            .execute(
+                "UPDATE creation_threads SET linked_project_id = ?1, lifecycle_stage = 'development', last_updated_ms = ?2 WHERE id = ?3",
+                params![project_id, now, thread_id],
+            )
+            .map_err(|err| err.to_string())?;
+        Ok((project_id, project_title))
+    }
+
+    fn seed_workflow_report_draft(
+        &self,
+        thread_id: &str,
+        project_title: &str,
+        user_message: &str,
+        now: i64,
+    ) -> StoreResult<()> {
+        self.conn
+            .execute(
+                r#"
+UPDATE feasibility_reports
+SET project_name = ?1,
+    problem_definition = ?2,
+    feasibility_conclusion = '统一 workflow 已启动',
+    updated_at_ms = ?3
+WHERE thread_id = ?4
+"#,
+                params![project_title, user_message, now, thread_id],
+            )
+            .map_err(|err| err.to_string())?;
+        Ok(())
+    }
+
+    fn trigger_creation_workflow(&self, project_id: &str) -> StoreResult<()> {
+        self.run_project_workflow(project_id, None)
+            .map(|_| ())
     }
 
     fn ensure_active_creation_thread(&self, thread_id: &str) -> StoreResult<()> {
@@ -153,4 +223,27 @@ impl Store {
             None => Err("当前线程不存在或已失效，请刷新线程列表后重试。".to_string()),
         }
     }
+}
+
+fn workflow_project_title(user_message: &str) -> String {
+    let title = user_message
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("新项目")
+        .trim()
+        .chars()
+        .take(32)
+        .collect::<String>();
+    if title.is_empty() {
+        "新项目".to_string()
+    } else {
+        title
+    }
+}
+
+fn workflow_started_message(project_title: &str) -> String {
+    format!(
+        "已创建项目「{}」并启动统一 workflow。我会从需求澄清、可行性分析、PRD、需求评审、研发计划、代码生成到代码评审依次推进。",
+        project_title
+    )
 }

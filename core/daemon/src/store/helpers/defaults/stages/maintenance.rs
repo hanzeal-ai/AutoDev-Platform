@@ -19,8 +19,6 @@ pub(in crate::store::helpers::defaults) fn maintenance() -> StageDefaults {
         ]),
         risk_items: vec!["运行异常", "反馈集中", "质量回落"],
         event_flow: vec!["问题上报", "修复完成", "维护观察"],
-        primary_action: "记录问题",
-        secondary_actions: vec!["触发新立项", "归档项目"],
         downloads: vec![
             StageDownloadDefaults {
                 id: "maintenance-log",

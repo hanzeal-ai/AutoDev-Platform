@@ -396,3 +396,17 @@ class WorkflowResumeContext(BaseModel):
         if not v or not ID_PATTERN.match(v):
             raise ValueError("invalid workflow_id")
         return v
+
+
+class WorkflowArtifactContext(WorkflowResumeContext):
+    """Request body for fetching one checkpointed workflow artifact."""
+
+    artifact_id: str = Field(max_length=256)
+
+    @field_validator("artifact_id")
+    @classmethod
+    def validate_artifact_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v or not re.match(r"^[a-zA-Z0-9_:-]{1,256}$", v):
+            raise ValueError("invalid artifact_id")
+        return v

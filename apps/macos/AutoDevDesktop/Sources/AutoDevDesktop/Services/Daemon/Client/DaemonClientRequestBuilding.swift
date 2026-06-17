@@ -37,27 +37,12 @@ extension DaemonClient {
         ["thread_id": threadID]
     }
 
-    static func planDevelopmentPayload(projectID: String) -> [String: Any] {
-        ["project_id": projectID]
-    }
-
     static func projectIDPayload(_ projectID: String) -> [String: Any] {
         ["project_id": projectID]
     }
 
-    static func advanceProjectStagePayload(projectID: String, action: String, autoTriggerAI: Bool) -> [String: Any] {
-        [
-            "project_id": projectID,
-            "action": action,
-            "auto_trigger_ai": autoTriggerAI,
-        ]
-    }
-
-    static func generateProjectStageAIPayload(projectID: String, stage: String?, feedback: String?) -> [String: Any] {
+    static func runProjectWorkflowPayload(projectID: String, feedback: String?) -> [String: Any] {
         var payload: [String: Any] = ["project_id": projectID]
-        if let stage {
-            payload["stage"] = stage
-        }
         if let feedback, !feedback.isEmpty {
             payload["feedback"] = feedback
         }

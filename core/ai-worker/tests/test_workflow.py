@@ -6,7 +6,10 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from autodev_ai.workflow import (
     build_workflow_graph,
+    build_workflow_status,
+    build_workflow_artifact,
     get_workflow_checkpoint_path,
+    _phase_result,
     workflow_config,
 )
 
@@ -501,3 +504,73 @@ def test_default_checkpoint_path_lives_under_ai_worker(monkeypatch):
 
     assert path.name == "autodev_workflow.sqlite"
     assert path.parent.name == ".checkpoints"
+
+
+def test_workflow_status_exposes_phase_state_and_artifact_ids_without_payloads():
+    state = {
+        "workflow_id": "wf-1",
+        "thread_id": "thread-1",
+        "project_id": "project-1",
+        "project_name": "Demo",
+        "current_phase": "development_complete",
+        "awaiting_user_input": False,
+        "feasibility_report": {"summary": "可行"},
+        "prd_result": {"summary": "PRD"},
+        "development_plan": {"summary": "研发计划"},
+    }
+
+    status = build_workflow_status(state)
+
+    assert status["workflow_id"] == "wf-1"
+    assert status["project_id"] == "project-1"
+    assert status["current_phase"] == "development_complete"
+    assert status["current_step"] == "development"
+    assert status["status"] == "running"
+    assert status["phases"]["report"]["status"] == "completed"
+    assert status["phases"]["report"]["artifact_id"] == "wf-1:report"
+    assert status["phases"]["prd"]["artifact_id"] == "wf-1:prd"
+    assert status["phases"]["development"]["artifact_id"] == "wf-1:development"
+    assert status["phases"]["coding"]["status"] == "pending"
+    assert "feasibility_report" not in status
+    assert "development_plan" not in status
+
+
+def test_workflow_artifact_returns_payload_by_id():
+    state = {
+        "workflow_id": "wf-1",
+        "project_id": "project-1",
+        "feasibility_report": {"summary": "可行"},
+    }
+
+    artifact = build_workflow_artifact(state, "wf-1:report")
+
+    assert artifact == {
+        "artifact_id": "wf-1:report",
+        "workflow_id": "wf-1",
+        "project_id": "project-1",
+        "stage": "report",
+        "name": "可行性分析报告",
+        "kind": "workflow-report",
+        "content_type": "application/json",
+        "content": {"summary": "可行"},
+    }
+
+
+def test_workflow_artifact_rejects_unknown_or_unavailable_artifact():
+    state = {
+        "workflow_id": "wf-1",
+        "project_id": "project-1",
+        "feasibility_report": {"summary": "可行"},
+    }
+
+    assert build_workflow_artifact(state, "wf-1:missing") is None
+    assert build_workflow_artifact(state, "wf-2:report") is None
+
+
+def test_phase_result_raises_on_worker_error_for_checkpoint_resume():
+    with pytest.raises(RuntimeError, match="coding interrupted"):
+        _phase_result(
+            {"error": "coding interrupted"},
+            "coding_result",
+            "coding_complete",
+        )

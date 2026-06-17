@@ -27,7 +27,6 @@ struct ProjectCreationPage: View {
                 }
             }
         )
-        let isConfirmingFeasibility = viewModel.isConfirmingFeasibility
         let isSendingCreationMessage = viewModel.isSendingCreationMessage
 
         return VStack(spacing: AutoDevViewTheme.pageSpacing) {
@@ -86,12 +85,9 @@ struct ProjectCreationPage: View {
                 } else {
                     FeasibilityDraftPanel(
                         draft: selectedThread?.reportDraft,
-                        selectedThreadID: selectedThreadID,
                         selectedLifecycleStage: selectedThreadStage,
-                        isConfirmingFeasibility: isConfirmingFeasibility,
                         onTogglePanel: { viewModel.toggleReportPanel() },
-                        onInsertReference: { reference in viewModel.appendCreationInputReference(reference) },
-                        onConfirmFeasibility: { threadID in viewModel.confirmFeasibilityAndEnterPRD(threadID: threadID) }
+                        onInsertReference: { reference in viewModel.appendCreationInputReference(reference) }
                     )
                     .frame(width: 372)
                 }

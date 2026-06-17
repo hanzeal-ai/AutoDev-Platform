@@ -20,8 +20,6 @@ pub(in crate::store::helpers::defaults) fn release() -> StageDefaults {
         ]),
         risk_items: vec!["发布阻塞", "检查项未通过", "回滚风险"],
         event_flow: vec!["发布准备", "发布开始", "回滚执行"],
-        primary_action: "确认发布",
-        secondary_actions: vec![],
         downloads: vec![
             StageDownloadDefaults {
                 id: "release-record",

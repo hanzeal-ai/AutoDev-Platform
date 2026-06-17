@@ -49,15 +49,11 @@ extension ShellViewModel {
     }
 
     func triggerStageAction(_ action: String) {
-        if shouldPlanDevelopment(for: action) {
-            planDevelopmentForSelectedProject()
-            return
-        }
         if handleStageSupportAction(action) {
             return
         }
-        if shouldAdvanceCurrentStage(for: action) {
-            advanceSelectedProjectStage(action: action)
+        if shouldRetryWorkflow(for: action) {
+            generateAIForSelectedStage(feedback: nil)
             return
         }
         state.triggerStageAction(action)
@@ -109,35 +105,12 @@ extension ShellViewModel {
         state.updateProjectLibrarySearchQuery(query)
     }
 
-    private func shouldPlanDevelopment(for action: String) -> Bool {
-        guard state.activeDetailStage == .development else {
-            return false
-        }
-        return action == ShellViewState.defaultPrimaryAction(for: .development)
-            || action == state.selectedStagePrimaryAction
+    private func shouldRetryWorkflow(for action: String) -> Bool {
+        guard let project = state.selectedProject, project.status != .completed else { return false }
+        return action == state.selectedStagePrimaryAction
+            || action == ShellViewState.defaultPrimaryAction(for: state.activeDetailStage)
+            || action.contains("重试")
             || action.contains("继续")
-    }
-
-    private func shouldAdvanceCurrentStage(for action: String) -> Bool {
-        guard let project = state.selectedProject, project.status != .completed else {
-            return false
-        }
-        switch state.activeDetailStage {
-        case .feasibility:
-            return action == state.selectedStagePrimaryAction || action.contains("确认立项")
-        case .prd:
-            return action == state.selectedStagePrimaryAction || action.contains("进入 UI") || action.contains("确认 PRD")
-        case .ui:
-            return action == state.selectedStagePrimaryAction || action.contains("进入研发")
-        case .development:
-            return action.contains("进入测试")
-        case .testing:
-            return action == state.selectedStagePrimaryAction || action.contains("确认发布")
-        case .release:
-            return action == state.selectedStagePrimaryAction || action.contains("确认发布")
-        case .maintenance:
-            return action == state.selectedStagePrimaryAction || action.contains("归档")
-        }
     }
 
     private func handleStageSupportAction(_ action: String) -> Bool {

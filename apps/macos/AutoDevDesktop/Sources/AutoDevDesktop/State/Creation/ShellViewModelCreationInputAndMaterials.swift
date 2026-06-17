@@ -142,7 +142,17 @@ extension ShellViewModel {
                         reportDraft: result.reportDraft
                     )
                     try await refreshCreationThreads()
-                    state.selectCreationThread(threadID)
+                    if
+                        let projectIDRaw = result.projectId,
+                        let projectID = UUID(uuidString: projectIDRaw)
+                    {
+                        try await refreshLiveSnapshot()
+                        state.openProjectDetail(projectID: projectID, from: .projectLibrary)
+                        state.selectDetailStage(.development)
+                        await refreshSelectedProjectDetail()
+                    } else {
+                        state.selectCreationThread(threadID)
+                    }
                     return
 
                 case .error(let errorMsg):

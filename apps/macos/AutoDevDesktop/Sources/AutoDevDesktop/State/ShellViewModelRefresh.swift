@@ -85,9 +85,8 @@ extension ShellViewModel {
             guard let self else { return }
             defer { isGeneratingStageAI = false }
             do {
-                _ = try await daemonClient.generateProjectStageAI(
+                _ = try await daemonClient.runProjectWorkflow(
                     projectID: requestKey.projectID.uuidString,
-                    stage: DomainMapper.stageKey(requestKey.stage),
                     feedback: feedback
                 )
                 guard state.selectedExecutionDetailKey == requestKey else { return }

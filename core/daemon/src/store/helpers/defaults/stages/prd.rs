@@ -18,8 +18,6 @@ pub(in crate::store::helpers::defaults) fn prd() -> StageDefaults {
         ]),
         risk_items: vec!["范围膨胀", "需求不完整", "依赖未确认"],
         event_flow: vec!["PRD 生成", "PRD 调整", "用户确认"],
-        primary_action: "确认 PRD",
-        secondary_actions: vec![],
         downloads: vec![StageDownloadDefaults {
             id: "prd-snapshot",
             title: "PRD 快照",

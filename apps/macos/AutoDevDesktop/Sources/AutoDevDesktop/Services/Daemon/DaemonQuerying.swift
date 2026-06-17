@@ -14,10 +14,7 @@ protocol DaemonQuerying {
     func addCreationMessage(threadID: String, content: String) async throws -> DaemonCommandResult
     func addCreationMessageStreaming(threadID: String, content: String) -> CreationStreamingHandle
     func addCreationMaterials(threadID: String, paths: [String]) async throws
-    func confirmFeasibility(threadID: String) async throws -> DaemonCommandResult
-    func advanceProjectStage(projectID: String, action: String, autoTriggerAI: Bool) async throws -> DaemonCommandResult
-    func planDevelopment(projectID: String) async throws -> DaemonCommandResult
-    func generateProjectStageAI(projectID: String, stage: String?, feedback: String?) async throws -> DaemonCommandResult
+    func runProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult
     func deleteProject(projectID: String) async throws
 }
 

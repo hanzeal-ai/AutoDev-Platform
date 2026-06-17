@@ -51,8 +51,6 @@ pub(super) struct StageDefaults {
     pub(super) step_progress: Value,
     pub(super) risk_items: Vec<&'static str>,
     pub(super) event_flow: Vec<&'static str>,
-    pub(super) primary_action: &'static str,
-    pub(super) secondary_actions: Vec<&'static str>,
     pub(super) downloads: Vec<StageDownloadDefaults>,
     pub(super) work_units: Vec<StageWorkUnitDefaults>,
 }

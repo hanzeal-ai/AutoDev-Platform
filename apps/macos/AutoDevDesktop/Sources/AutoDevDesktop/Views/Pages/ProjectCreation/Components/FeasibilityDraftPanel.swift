@@ -2,12 +2,9 @@ import SwiftUI
 
 struct FeasibilityDraftPanel: View {
     let draft: FeasibilityReportDraft?
-    let selectedThreadID: UUID?
     let selectedLifecycleStage: DeliveryLifecycleStage
-    let isConfirmingFeasibility: Bool
     let onTogglePanel: () -> Void
     let onInsertReference: (String) -> Void
-    let onConfirmFeasibility: (UUID) -> Void
 
     var body: some View {
         DashboardCard(title: "可行性报告草稿") {
@@ -26,26 +23,6 @@ struct FeasibilityDraftPanel: View {
                 HStack {
                     LifecycleBadge(stage: selectedLifecycleStage)
                     Spacer()
-                    Button(action: {
-                        guard let selectedThreadID = selectedThreadID else { return }
-                        onConfirmFeasibility(selectedThreadID)
-                    }) {
-                        if isConfirmingFeasibility {
-                            HStack(spacing: 6) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("确认中...")
-                            }
-                        } else {
-                            Text("确认立项")
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(
-                        selectedLifecycleStage != .feasibility ||
-                            selectedThreadID == nil ||
-                            isConfirmingFeasibility
-                    )
                 }
 
                 if let draft = draft {

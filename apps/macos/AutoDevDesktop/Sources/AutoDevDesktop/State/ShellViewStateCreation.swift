@@ -134,10 +134,6 @@ extension ShellViewState {
         renameThreadDraft = ""
     }
 
-    mutating func confirmFeasibilityAndEnterPRD() {
-        statusMessage = "预览模式不支持确认立项"
-    }
-
     mutating func sendCreationInput() {
         creationInputDraft = ""
         statusMessage = "预览模式不支持发送消息"

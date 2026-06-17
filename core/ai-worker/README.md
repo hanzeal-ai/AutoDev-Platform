@@ -7,10 +7,15 @@ LangGraph + FastAPI AI 编排服务，作为 Rust Daemon 的 AI sidecar。
 ```
 Rust Daemon ──HTTP──▶ AI Worker (localhost:9720)
                          │
-                         ├─ /generate/stage    → LangGraph 阶段编排 (SSE streaming)
-                         ├─ /generate/report   → 可行性报告生成
+                         ├─ /workflow/start    → 统一交付 workflow 启动
+                         ├─ /workflow/resume   → 统一交付 workflow 断点恢复
+                         ├─ /workflow/status   → 统一交付 workflow 状态查询
+                         ├─ /workflow/artifact → 按 artifact_id 查询阶段产物
                          └─ /health            → 健康检查
 ```
+
+需求澄清、可行性报告、PRD、评审、研发计划、代码生成和代码评审均已收敛到
+`/workflow/*`，不再暴露单步骤 `/generate/*` 接口。
 
 ## 开发
 

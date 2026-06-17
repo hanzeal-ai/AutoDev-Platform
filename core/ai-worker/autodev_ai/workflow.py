@@ -80,6 +80,49 @@ NodeName = Literal[
 DEFAULT_MAX_PRD_REVIEW_ITERATIONS = 2
 DEFAULT_MAX_CODE_REVIEW_ITERATIONS = 3
 
+WORKFLOW_ARTIFACTS: dict[str, dict[str, str]] = {
+    "chat": {
+        "state_key": "chat_result",
+        "name": "需求澄清结果",
+        "kind": "workflow-chat",
+    },
+    "report": {
+        "state_key": "feasibility_report",
+        "name": "可行性分析报告",
+        "kind": "workflow-report",
+    },
+    "prd": {
+        "state_key": "prd_result",
+        "name": "产品需求文档",
+        "kind": "workflow-prd",
+    },
+    "prd_review": {
+        "state_key": "prd_review_result",
+        "name": "需求评审",
+        "kind": "workflow-prd-review",
+    },
+    "development": {
+        "state_key": "development_plan",
+        "name": "研发计划",
+        "kind": "workflow-development-plan",
+    },
+    "coding": {
+        "state_key": "coding_result",
+        "name": "代码生成结果",
+        "kind": "workflow-coding",
+    },
+    "code_review": {
+        "state_key": "code_review_result",
+        "name": "代码评审",
+        "kind": "workflow-code-review",
+    },
+    "summary": {
+        "state_key": "workflow_summary",
+        "name": "项目完成总结",
+        "kind": "workflow-summary",
+    },
+}
+
 
 _prd_graph = build_prd_graph()
 _development_graph = build_development_graph()
@@ -110,12 +153,84 @@ async def resume_workflow(workflow_id: str) -> dict[str, Any]:
 
 
 async def get_workflow_status(workflow_id: str) -> dict[str, Any]:
+    return build_workflow_status(await _get_checkpoint_state(workflow_id))
+
+
+async def get_workflow_artifact(workflow_id: str, artifact_id: str) -> dict[str, Any] | None:
+    return build_workflow_artifact(await _get_checkpoint_state(workflow_id), artifact_id)
+
+
+async def _get_checkpoint_state(workflow_id: str) -> dict[str, Any]:
     checkpoint_path = get_workflow_checkpoint_path()
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
         graph = build_workflow_graph(checkpointer=checkpointer)
         snapshot = await graph.aget_state(workflow_config(workflow_id))
     return dict(snapshot.values or {})
+
+
+def build_workflow_status(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Return workflow progress metadata without embedding large artifact payloads."""
+    workflow_id = str(state.get("workflow_id") or state.get("project_id") or "").strip()
+    current_phase = str(state.get("current_phase") or "").strip()
+    current_step = _step_from_phase(current_phase)
+    error = state.get("error")
+    awaiting_user_input = bool(state.get("awaiting_user_input"))
+    status = _workflow_status(current_phase, error, awaiting_user_input)
+    phases = {
+        stage: _phase_status(state, workflow_id, stage)
+        for stage in WORKFLOW_ARTIFACTS
+    }
+    artifacts = [
+        {
+            "artifact_id": phase["artifact_id"],
+            "stage": stage,
+            "name": phase["name"],
+            "kind": phase["kind"],
+            "status": phase["status"],
+        }
+        for stage, phase in phases.items()
+        if phase.get("artifact_id")
+    ]
+    return {
+        "workflow_id": workflow_id,
+        "thread_id": state.get("thread_id", ""),
+        "project_id": state.get("project_id", ""),
+        "project_name": state.get("project_name", ""),
+        "current_phase": current_phase,
+        "current_step": current_step,
+        "status": status,
+        "awaiting_user_input": awaiting_user_input,
+        "error": error,
+        "phases": phases,
+        "artifacts": artifacts,
+    }
+
+
+def build_workflow_artifact(
+    state: Mapping[str, Any],
+    artifact_id: str,
+) -> dict[str, Any] | None:
+    workflow_id = str(state.get("workflow_id") or state.get("project_id") or "").strip()
+    if not workflow_id or not artifact_id.startswith(f"{workflow_id}:"):
+        return None
+    stage = artifact_id.removeprefix(f"{workflow_id}:")
+    spec = WORKFLOW_ARTIFACTS.get(stage)
+    if spec is None:
+        return None
+    content = state.get(spec["state_key"])
+    if not content:
+        return None
+    return {
+        "artifact_id": artifact_id,
+        "workflow_id": workflow_id,
+        "project_id": state.get("project_id", ""),
+        "stage": stage,
+        "name": spec["name"],
+        "kind": spec["kind"],
+        "content_type": "application/json",
+        "content": content,
+    }
 
 
 async def _invoke_persistent_workflow(
@@ -127,7 +242,7 @@ async def _invoke_persistent_workflow(
     async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
         graph = build_workflow_graph(checkpointer=checkpointer)
         result = await graph.ainvoke(state, config=workflow_config(workflow_id))
-    return dict(result or {})
+    return build_workflow_status(dict(result or {}))
 
 
 def build_workflow_graph(
@@ -478,13 +593,75 @@ def _route_after_code_review(state: AutoDevWorkflowState) -> str:
 
 def _phase_result(worker_state: dict[str, Any], result_key: str, phase: str) -> dict[str, Any]:
     if worker_state.get("error"):
-        return {"error": str(worker_state["error"]), "current_phase": f"{phase}_failed"}
+        raise RuntimeError(str(worker_state["error"]))
     result = worker_state.get("result")
     if result is None:
-        return {"error": f"{phase} completed without result", "current_phase": f"{phase}_failed"}
+        raise RuntimeError(f"{phase} completed without result")
     if hasattr(result, "model_dump"):
         result = result.model_dump()
     return {result_key: result, "current_phase": phase, "error": None}
+
+
+def _phase_status(state: Mapping[str, Any], workflow_id: str, stage: str) -> dict[str, Any]:
+    spec = WORKFLOW_ARTIFACTS[stage]
+    has_artifact = bool(state.get(spec["state_key"]))
+    current_step = _step_from_phase(str(state.get("current_phase") or ""))
+    status = "completed" if has_artifact else "pending"
+    if current_step == stage and not has_artifact:
+        status = "running"
+    if current_step == stage and state.get("error"):
+        status = "failed"
+    artifact_id = f"{workflow_id}:{stage}" if workflow_id and has_artifact else None
+    return {
+        "status": status,
+        "artifact_id": artifact_id,
+        "name": spec["name"],
+        "kind": spec["kind"],
+    }
+
+
+def _workflow_status(
+    current_phase: str,
+    error: Any,
+    awaiting_user_input: bool,
+) -> str:
+    if error:
+        return "failed"
+    if awaiting_user_input or current_phase == "awaiting_user_input":
+        return "awaiting_user_input"
+    if current_phase == "workflow_complete":
+        return "completed"
+    if current_phase.endswith("_blocked"):
+        return "blocked"
+    if not current_phase:
+        return "not_started"
+    return "running"
+
+
+def _step_from_phase(current_phase: str) -> str:
+    if not current_phase:
+        return "not_started"
+    if current_phase == "workflow_complete":
+        return "summary"
+    if current_phase == "awaiting_user_input":
+        return "chat"
+    if current_phase.startswith("chat"):
+        return "chat"
+    if current_phase.startswith("report"):
+        return "report"
+    if current_phase.startswith("prd_review"):
+        return "prd_review"
+    if current_phase.startswith("prd"):
+        return "prd"
+    if current_phase.startswith("development"):
+        return "development"
+    if current_phase.startswith("code_review"):
+        return "code_review"
+    if current_phase.startswith("coding"):
+        return "coding"
+    if current_phase.startswith("summary"):
+        return "summary"
+    return current_phase.split("_", 1)[0]
 
 
 def _parse_review_response(raw_text: str, *, default_summary: str) -> dict[str, Any]:

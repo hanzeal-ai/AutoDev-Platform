@@ -19,8 +19,6 @@ pub(in crate::store::helpers::defaults) fn testing() -> StageDefaults {
         ]),
         risk_items: vec!["关键失败项", "阻塞未清", "质量未达标"],
         event_flow: vec!["测试启动", "失败记录", "回归通过"],
-        primary_action: "确认发布",
-        secondary_actions: vec![],
         downloads: vec![
             StageDownloadDefaults {
                 id: "test-report",

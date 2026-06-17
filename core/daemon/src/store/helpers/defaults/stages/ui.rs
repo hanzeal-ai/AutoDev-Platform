@@ -19,8 +19,6 @@ pub(in crate::store::helpers::defaults) fn ui() -> StageDefaults {
         ]),
         risk_items: vec!["交互冲突", "信息架构不清", "视觉未定稿"],
         event_flow: vec!["页面结构生成", "交互更新", "设计确认"],
-        primary_action: "跳过 UI，进入研发",
-        secondary_actions: vec!["继续完善 UI"],
         downloads: vec![StageDownloadDefaults {
             id: "ui-snapshot",
             title: "UI 方案快照",

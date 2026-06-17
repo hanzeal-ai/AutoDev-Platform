@@ -35,8 +35,6 @@ pub(in crate::store::helpers::defaults) fn development() -> StageDefaults {
             "推进 preview 稳定预览",
             "打包归档可下载产物",
         ],
-        primary_action: "继续推进",
-        secondary_actions: vec!["查看预览", "进入测试"],
         downloads: vec![
             StageDownloadDefaults {
                 id: "frontend-tasks",

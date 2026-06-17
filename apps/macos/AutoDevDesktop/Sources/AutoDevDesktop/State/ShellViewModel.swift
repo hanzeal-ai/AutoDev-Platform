@@ -4,8 +4,6 @@ import SwiftUI
 final class ShellViewModel: ObservableObject {
     @Published var state: ShellViewState
     @Published var isChecking: Bool = false
-    @Published var isConfirmingFeasibility: Bool = false
-    @Published var isPlanningDevelopment: Bool = false
     @Published var isGeneratingStageAI: Bool = false
     @Published var isSendingCreationMessage: Bool = false
     @Published private(set) var transientCreationMessagesByThread: [UUID: [CreationConversationMessage]] = [:]
@@ -18,10 +16,7 @@ final class ShellViewModel: ObservableObject {
     var hasLoaded = false
     var detailRefreshTask: Task<Void, Never>?
     var stageAIRefreshTask: Task<Void, Never>?
-    var autoAdvanceTask: Task<Void, Never>?
     var healthCheckTask: Task<Void, Never>?
-    var autoAdvanceDepth: Int = 0
-    static let maxAutoAdvanceDepth = 3
 
     init(
         daemonClient: DaemonQuerying = DaemonClient(),

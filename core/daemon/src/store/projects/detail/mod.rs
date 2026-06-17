@@ -11,17 +11,14 @@ use std::thread;
 use std::time::Duration;
 
 impl Store {
-    pub fn generate_project_stage_ai(
+    pub fn run_project_workflow(
         &self,
         project_id: &str,
-        stage: Option<&str>,
         feedback: Option<&str>,
     ) -> StoreResult<Value> {
         let project_id = project_id.trim().to_lowercase();
         let project = query::load_project(self, &project_id)?;
-        let active_stage = stage
-            .map(ToString::to_string)
-            .unwrap_or_else(|| project.lifecycle_stage.clone());
+        let active_stage = project.lifecycle_stage.clone();
         let active_stage = if active_stage.is_empty() {
             "development".to_string()
         } else {

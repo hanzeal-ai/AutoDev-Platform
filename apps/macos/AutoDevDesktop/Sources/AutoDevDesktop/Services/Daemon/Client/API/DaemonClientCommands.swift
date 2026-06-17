@@ -40,7 +40,7 @@ extension DaemonClient {
             messageType: IPCContract.MessageType.addCreationMessageCommand,
             payload: Self.addCreationMessagePayload(threadID: threadID, content: content),
             expectedResponse: IPCContract.MessageType.addCreationMessageSuccess,
-            timeoutSeconds: 60
+            timeoutSeconds: 900
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
         }
@@ -54,44 +54,12 @@ extension DaemonClient {
         ) { _ in true }
     }
 
-    func confirmFeasibility(threadID: String) async throws -> DaemonCommandResult {
+    func runProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
-            messageType: IPCContract.MessageType.confirmFeasibilityCommand,
-            payload: Self.threadIDPayload(threadID),
-            expectedResponse: IPCContract.MessageType.confirmFeasibilitySuccess,
-            timeoutSeconds: 60
-        ) { payload in
-            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
-        }
-    }
-
-    func planDevelopment(projectID: String) async throws -> DaemonCommandResult {
-        try await sendDecodedRequest(
-            messageType: IPCContract.MessageType.planDevelopmentCommand,
-            payload: Self.planDevelopmentPayload(projectID: projectID),
-            expectedResponse: IPCContract.MessageType.planDevelopmentSuccess
-        ) { payload in
-            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
-        }
-    }
-
-    func advanceProjectStage(projectID: String, action: String, autoTriggerAI: Bool) async throws -> DaemonCommandResult {
-        try await sendDecodedRequest(
-            messageType: IPCContract.MessageType.advanceProjectStageCommand,
-            payload: Self.advanceProjectStagePayload(projectID: projectID, action: action, autoTriggerAI: autoTriggerAI),
-            expectedResponse: IPCContract.MessageType.advanceProjectStageSuccess,
-            timeoutSeconds: 60
-        ) { payload in
-            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
-        }
-    }
-
-    func generateProjectStageAI(projectID: String, stage: String?, feedback: String?) async throws -> DaemonCommandResult {
-        try await sendDecodedRequest(
-            messageType: IPCContract.MessageType.generateProjectStageAICommand,
-            payload: Self.generateProjectStageAIPayload(projectID: projectID, stage: stage, feedback: feedback),
-            expectedResponse: IPCContract.MessageType.generateProjectStageAISuccess,
-            timeoutSeconds: 60
+            messageType: IPCContract.MessageType.runProjectWorkflowCommand,
+            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback),
+            expectedResponse: IPCContract.MessageType.runProjectWorkflowSuccess,
+            timeoutSeconds: 900
         ) { payload in
             try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
         }
@@ -127,7 +95,7 @@ extension DaemonClient {
                     try await DaemonHTTPTransport.exchangeStreaming(
                         body: body,
                         baseURL: apiBaseURL,
-                        timeoutSeconds: 120
+                        timeoutSeconds: 900
                     ) { responseData in
                         // Check cancellation on each line
                         guard !Task.isCancelled else { return false }

@@ -18,8 +18,6 @@ pub(in crate::store::helpers::defaults) fn feasibility() -> StageDefaults {
         ]),
         risk_items: vec!["问题定义不闭合", "关键约束未完整", "资料结论冲突"],
         event_flow: vec!["需求挖掘", "报告更新", "立项确认"],
-        primary_action: "确认立项",
-        secondary_actions: vec!["继续讨论", "补充资料"],
         downloads: vec![
             StageDownloadDefaults {
                 id: "feasibility-report",

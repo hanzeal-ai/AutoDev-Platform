@@ -59,19 +59,7 @@ private struct PreviewDaemonClient: DaemonQuerying {
 
     func addCreationMaterials(threadID _: String, paths _: [String]) async throws {}
 
-    func confirmFeasibility(threadID _: String) async throws -> DaemonCommandResult {
-        throw DaemonClientError.malformedResponse
-    }
-
-    func advanceProjectStage(projectID _: String, action _: String, autoTriggerAI _: Bool) async throws -> DaemonCommandResult {
-        throw DaemonClientError.malformedResponse
-    }
-
-    func planDevelopment(projectID _: String) async throws -> DaemonCommandResult {
-        throw DaemonClientError.malformedResponse
-    }
-
-    func generateProjectStageAI(projectID _: String, stage _: String?, feedback _: String?) async throws -> DaemonCommandResult {
+    func runProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
 

@@ -1,11 +1,8 @@
-mod advance_project_stage;
 mod creation_messages;
 mod creation_threads;
 mod delete_project;
-mod feasibility;
-mod generate_project_stage_ai;
 mod materials;
-mod plan_development;
+mod run_project_workflow;
 
 use crate::protocol;
 use crate::runtime;
@@ -35,17 +32,8 @@ pub(super) fn dispatch(
         protocol::MESSAGE_COMMAND_ADD_CREATION_MATERIALS => {
             Some(materials::handle_add_materials(inbound, runtime_paths))
         }
-        protocol::MESSAGE_COMMAND_CONFIRM_FEASIBILITY => {
-            Some(feasibility::handle_confirm(inbound, runtime_paths))
-        }
-        protocol::MESSAGE_COMMAND_ADVANCE_PROJECT_STAGE => Some(
-            advance_project_stage::handle_advance(inbound, runtime_paths),
-        ),
-        protocol::MESSAGE_COMMAND_PLAN_DEVELOPMENT => {
-            Some(plan_development::handle_plan(inbound, runtime_paths))
-        }
-        protocol::MESSAGE_COMMAND_GENERATE_PROJECT_STAGE_AI => Some(
-            generate_project_stage_ai::handle_generate(inbound, runtime_paths),
+        protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW => Some(
+            run_project_workflow::handle_run(inbound, runtime_paths),
         ),
         protocol::MESSAGE_COMMAND_DELETE_PROJECT => {
             Some(delete_project::handle_delete(inbound, runtime_paths))

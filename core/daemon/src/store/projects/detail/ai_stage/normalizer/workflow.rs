@@ -7,6 +7,45 @@ use uuid::Uuid;
 
 use super::sanitize_path_component;
 
+pub(crate) fn persist_generic_workflow_artifact(
+    store: &Store,
+    project_id: &str,
+    stage_key: &str,
+    label: &str,
+    kind: &str,
+    content: &Value,
+) -> StoreResult<()> {
+    let objective = content
+        .get("summary")
+        .or_else(|| content.get("feasibility_conclusion"))
+        .or_else(|| content.get("assistant_reply"))
+        .and_then(Value::as_str)
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or(label);
+    let input_contexts = json!([
+        format!("产物类型：{}", kind),
+        "来源：统一 workflow graph"
+    ]);
+    let step_progress = json!([
+        {"title": format!("{} 已生成", label), "status": "completed"}
+    ]);
+    let markdown = render_generic_markdown(label, content);
+    persist_workflow_stage(
+        store,
+        project_id,
+        stage_key,
+        label,
+        objective,
+        input_contexts,
+        step_progress,
+        json!([]),
+        json!([]),
+        "查看阶段产物",
+        json!([]),
+        markdown,
+    )
+}
+
 pub(crate) fn persist_workflow_review(
     store: &Store,
     project_id: &str,
@@ -322,6 +361,26 @@ fn render_summary_markdown(content: &Value) -> String {
     if let Some(summary) = content.get("code_review_summary").and_then(Value::as_str) {
         md.push_str(&format!("- 代码评审：{}\n", summary));
     }
+    md
+}
+
+fn render_generic_markdown(label: &str, content: &Value) -> String {
+    let mut md = format!("# {}\n\n", label);
+    if let Some(summary) = content.get("summary").and_then(Value::as_str) {
+        md.push_str(&format!("## 摘要\n\n{}\n\n", summary));
+    }
+    if let Some(conclusion) = content
+        .get("feasibility_conclusion")
+        .and_then(Value::as_str)
+    {
+        md.push_str(&format!("## 可行性结论\n\n{}\n\n", conclusion));
+    }
+    if let Some(reply) = content.get("assistant_reply").and_then(Value::as_str) {
+        md.push_str(&format!("## 回复\n\n{}\n\n", reply));
+    }
+    md.push_str("## 原始结构化产物\n\n```json\n");
+    md.push_str(&serde_json::to_string_pretty(content).unwrap_or_else(|_| "{}".to_string()));
+    md.push_str("\n```\n");
     md
 }
 
