@@ -263,7 +263,7 @@ extension ShellViewModel {
     func cancelCreationMessage() {
         guard isSendingCreationMessage else { return }
 
-        // 1. Cancel the socket — stops the background I/O thread immediately
+        // 1. Cancel the HTTP stream task immediately
         creationStreamHandle?.cancel()
         creationStreamHandle = nil
 

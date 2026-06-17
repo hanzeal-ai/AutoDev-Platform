@@ -1,15 +1,15 @@
 # AI AutoDev Platform
 
-Mac-first AI-driven software delivery platform. The native SwiftUI/AppKit desktop app talks to a Rust daemon over local Unix socket IPC.
+AI-driven software delivery platform. The native SwiftUI/AppKit desktop app talks to a Rust backend API over HTTP RPC, so the same contract can run locally or behind a deployed server endpoint.
 
 ## Current Architectural Stance
 
-- Mac-first product, cloud-assisted collaboration.
+- Mac-first client with server-deployable backend.
 - `SwiftUI/AppKit` for native macOS experience.
 - `Rust` as the system core language.
 - `Artifact Graph + Event Log` as the system of record.
 - Modular monolith first, event-driven inside, workers for async integration.
-- Local-first execution with cloud sync.
+- Server-oriented execution with local development defaults.
 
 ## What Is Intentionally Not Frozen Yet
 
@@ -26,7 +26,7 @@ These should be designed after the bounded contexts and event contracts are stab
 - `apps/macos/AutoDevDesktop`
   - Native macOS shell app (`SwiftUI + AppKit`).
 - `core/daemon`
-  - Rust daemon that owns runtime boundary and listens on Unix domain socket, including the structured stage-detail payload used by the shell.
+  - Rust backend API that owns runtime boundary and exposes HTTP RPC, including the structured stage-detail payload used by the shell.
 - `scripts/dev-preview.sh`
   - Starts the daemon and opens the Xcode project for normal macOS development.
 - `scripts/dev-daemon.sh`
@@ -39,11 +39,11 @@ These should be designed after the bounded contexts and event contracts are stab
 - `apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/ShellViewModel.swift`
   - UI-facing state and async orchestration, but no core business rules.
 - `apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/IPCContract.swift`
-  - Swift-side IPC contract and payload decoding.
+  - Swift-side envelope contract and payload decoding.
 - `apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/DaemonClient.swift`
-  - Unix socket transport only.
+  - HTTP backend client configuration.
 - `core/daemon/src/protocol.rs`
-  - Rust-side IPC envelopes and message contract.
+  - Rust-side envelopes and message contract.
 - `core/daemon/src/runtime.rs`
   - Runtime paths and daemon-owned runtime metadata.
 - `core/daemon/src/main.rs`
@@ -51,19 +51,19 @@ These should be designed after the bounded contexts and event contracts are stab
 
 ## Standard macOS Development Flow
 
-1. Start the daemon in one terminal:
+1. Start the backend API in one terminal:
 
 ```bash
 ./scripts/dev-daemon.sh
 ```
 
-2. Open the project in Xcode:
+1. Open the project in Xcode:
 
 ```bash
 open apps/macos/AutoDevDesktop/AutoDevDesktop.xcodeproj
 ```
 
-3. Use the normal Xcode loop:
+1. Use the normal Xcode loop:
 
 - run the `AutoDevDesktop` scheme
 - use SwiftUI Preview in `ContentView.swift` (recommended entry file)
@@ -106,4 +106,4 @@ Terminal 2:
 open apps/macos/AutoDevDesktop/AutoDevDesktop.xcodeproj
 ```
 
-The app opens a shell window and runs a daemon health check through local Unix socket IPC.
+The app opens a shell window and runs a backend health check through HTTP RPC. Local development defaults to `http://127.0.0.1:7373`; set `AUTODEV_API_BASE_URL` for a deployed server endpoint.

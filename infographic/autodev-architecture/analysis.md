@@ -10,7 +10,7 @@ Technical system architecture — multi-layer distributed system
 
 ## Complexity
 
-High — 3 runtime layers, IPC protocol, AI pipeline, domain-driven design
+High — 3 runtime layers, HTTP RPC protocol, AI pipeline, domain-driven design
 
 ## Tone
 
@@ -37,7 +37,7 @@ Chinese (zh)
 ## Learning Objectives
 
 1. Understand the 3-layer runtime topology (Swift App / Rust Daemon / Python AI Worker)
-2. Understand the IPC communication protocol (Unix socket, line-delimited JSON, envelope pattern)
+2. Understand the HTTP RPC communication protocol (JSON envelope pattern, JSON Lines streaming)
 3. Understand the AI request pipeline (streaming SSE, LangGraph, DeepSeek)
 4. Understand the software delivery lifecycle phases and their data flow
 
@@ -49,10 +49,10 @@ Layout: hub-spoke | Style: technical-schematic
 Shows: macOS App ↔ Rust Daemon ↔ Python AI Worker ↔ DeepSeek API + SQLite
 Aspect: landscape (16:9)
 
-### Diagram 2: IPC Message Flow (Request → Response)
+### Diagram 2: HTTP RPC Message Flow (Request → Response)
 
 Layout: linear-progression | Style: technical-schematic
-Shows: SwiftUI View → ViewModel → DaemonClient → Unix Socket → Router → Store → Response
+Shows: SwiftUI View → ViewModel → DaemonClient → HTTP RPC → Router → Store → Response
 Aspect: landscape (16:9)
 
 ### Diagram 3: Software Delivery Lifecycle

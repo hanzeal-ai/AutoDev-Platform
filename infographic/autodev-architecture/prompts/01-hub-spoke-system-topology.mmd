@@ -4,13 +4,13 @@ graph LR
         direction TB
         VIEWS["🖥️ SwiftUI Views\n─────────────\nShellView\nProjectDetailPage\nCreationPage"]
         VM["⚙️ ShellViewModel\n─────────────\n@MainActor\nObservableObject\nShellViewState"]
-        DC["📡 DaemonClient\n─────────────\nAF_UNIX Socket\nIPCRequestEnvelope\nAsyncStream"]
+        DC["📡 DaemonClient\n─────────────\nHTTP RPC\nJSON Envelope\nAsyncStream"]
         VIEWS --> VM --> DC
     end
 
     subgraph RustDaemon["  Rust Core Daemon  autodev-daemon  "]
         direction TB
-        SERVER["🔌 Socket Server\n─────────────\nper-client threads\nwrite_envelope\nstreaming branch"]
+        SERVER["🌐 HTTP RPC Server\n─────────────\nPOST /rpc\nJSON response\nJSON Lines stream"]
         ROUTER["🔀 Router\n─────────────\ndispatch_query\ndispatch_command\nis_streaming_cmd"]
         STORE["🗄️ Store\n─────────────\nprojects / threads\nmessages / reports\nartifacts / events"]
         AICLIENT["🤖 AI Worker Client\n─────────────\nHTTP + SSE\nrequest_chat_stream\nrequest_stage_gen"]
@@ -35,7 +35,7 @@ graph LR
 
     DEEPSEEK["☁️ DeepSeek API\n─────────────\ndeepseek-chat\ndeepseek-reasoner\nStreaming SSE"]
 
-    DC <-->|"Unix Domain Socket\n行分隔 JSON 信封\nschema_version=1"| SERVER
+    DC <-->|"HTTP RPC\nJSON 信封\nschema_version=1"| SERVER
     AICLIENT <-->|"HTTP + SSE\nlocalhost:9720\nasyncio.timeout=130s"| FASTAPI
     STORE --- DB
     STORE --- BLOBS

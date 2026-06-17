@@ -111,28 +111,26 @@ extension DaemonClient {
         threadID: String,
         content: String
     ) -> CreationStreamingHandle {
-        let cancelHandle = CancellableSocket()
-        let handle = CreationStreamingHandle(cancelHandle: cancelHandle)
+        let handle = CreationStreamingHandle()
 
         handle.stream = AsyncStream { continuation in
             continuation.onTermination = { @Sendable _ in
-                cancelHandle.cancel()
+                handle.cancel()
             }
 
-            DispatchQueue.global(qos: .userInitiated).async { [self] in
+            let task = Task { [self] in
                 do {
-                    let line = try Self.encodeRequestLine(
+                    let body = try Self.encodeRequestBody(
                         messageType: IPCContract.MessageType.addCreationMessageStreamCommand,
                         payload: Self.addCreationMessagePayload(threadID: threadID, content: content)
                     )
-                    try DaemonUnixSocketTransport.exchangeStreaming(
-                        line: line,
-                        socketPath: socketPath,
-                        cancelHandle: cancelHandle,
+                    try await DaemonHTTPTransport.exchangeStreaming(
+                        body: body,
+                        baseURL: apiBaseURL,
                         timeoutSeconds: 120
                     ) { responseData in
                         // Check cancellation on each line
-                        guard !cancelHandle.isCancelled else { return false }
+                        guard !Task.isCancelled else { return false }
 
                         guard let envelope = try? IPCResponseEnvelope.decode(from: responseData) else {
                             return true // skip unparseable lines
@@ -174,12 +172,13 @@ extension DaemonClient {
                     // If we got here without finishing (e.g. cancelled), finish now
                     continuation.finish()
                 } catch {
-                    if !cancelHandle.isCancelled {
+                    if !Task.isCancelled {
                         continuation.yield(.error(error.localizedDescription))
                     }
                     continuation.finish()
                 }
             }
+            handle.attach(task: task)
         }
 
         return handle
@@ -194,17 +193,23 @@ enum CreationStreamEvent: Sendable {
     case error(String)
 }
 
-/// Bundles an AsyncStream with a cancellation handle for direct socket shutdown.
+/// Bundles an AsyncStream with a cancellation handle for the HTTP stream task.
 final class CreationStreamingHandle: @unchecked Sendable {
     var stream: AsyncStream<CreationStreamEvent> = AsyncStream { $0.finish() }
-    private let cancelHandle: CancellableSocket
+    private let lock = NSLock()
+    private var task: Task<Void, Never>?
 
-    init(cancelHandle: CancellableSocket) {
-        self.cancelHandle = cancelHandle
+    func attach(task: Task<Void, Never>) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.task = task
     }
 
-    /// Immediately shuts down the underlying socket, stopping all I/O.
     func cancel() {
-        cancelHandle.cancel()
+        lock.lock()
+        let task = self.task
+        self.task = nil
+        lock.unlock()
+        task?.cancel()
     }
 }

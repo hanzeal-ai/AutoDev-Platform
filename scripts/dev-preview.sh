@@ -2,7 +2,7 @@
 # -------------------------------------------------------------------
 # dev-preview.sh — Start the full dev stack:
 #   1. Python AI Worker  (LangGraph + FastAPI, port 9720)
-#   2. Rust Daemon       (Unix socket IPC)
+#   2. Rust Backend API  (HTTP RPC, port 7373 by default)
 #   3. Xcode             (SwiftUI app)
 #
 # Ctrl-C or closing the terminal stops all processes cleanly.
@@ -24,7 +24,7 @@ cleanup() {
   echo "[dev-preview] Shutting down..."
 
   if [[ -n "$DAEMON_PID" ]]; then
-    echo "[dev-preview] Stopping Rust Daemon (pid $DAEMON_PID)"
+    echo "[dev-preview] Stopping Rust Backend API (pid $DAEMON_PID)"
     kill "$DAEMON_PID" 2>/dev/null || true
     wait "$DAEMON_PID" 2>/dev/null || true
   fi
@@ -57,19 +57,23 @@ WORKER_PID=$!
 # Wait briefly and verify worker started
 sleep 2
 if ! kill -0 "$WORKER_PID" 2>/dev/null; then
-  echo "[dev-preview] ⚠ AI Worker failed to start (check $WORKER_LOG/combined.log)"
-  echo "[dev-preview] Continuing without AI Worker — Rust will use direct DeepSeek fallback."
+  if grep -q "AI Worker already running" "$WORKER_LOG/combined.log" 2>/dev/null; then
+    echo "[dev-preview] AI Worker already running"
+  else
+    echo "[dev-preview] ⚠ AI Worker failed to start (check $WORKER_LOG/combined.log)"
+    echo "[dev-preview] Continuing without AI Worker — Rust will use direct DeepSeek fallback."
+  fi
   WORKER_PID=""
 else
   echo "[dev-preview] AI Worker started (pid $WORKER_PID)"
 fi
 
-# ── 2. Start Rust Daemon ──────────────────────────────────────────
-echo "[dev-preview] Starting Rust Daemon..."
+# ── 2. Start Rust Backend API ─────────────────────────────────────
+echo "[dev-preview] Starting Rust Backend API..."
 "$ROOT_DIR/scripts/dev-daemon.sh" &
 DAEMON_PID=$!
 sleep 1
-echo "[dev-preview] Rust Daemon started (pid $DAEMON_PID)"
+echo "[dev-preview] Rust Backend API started (pid $DAEMON_PID, ${AUTODEV_API_BASE_URL:-http://127.0.0.1:7373})"
 
 # ── 3. Open Xcode ─────────────────────────────────────────────────
 echo "[dev-preview] Opening Xcode..."

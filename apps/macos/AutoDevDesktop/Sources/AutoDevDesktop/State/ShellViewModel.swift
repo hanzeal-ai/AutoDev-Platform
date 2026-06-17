@@ -35,7 +35,7 @@ final class ShellViewModel: ObservableObject {
             dataMode == .liveDaemon &&
                 !ProcessInfo.processInfo.environment.keys.contains("XCODE_RUNNING_FOR_PREVIEWS")
         )
-        self.state = initialState ?? .initial(socketPath: daemonClient.socketPath)
+        self.state = initialState ?? .initial(apiBaseURL: daemonClient.apiBaseURL)
     }
 
     func displayedCreationMessages(

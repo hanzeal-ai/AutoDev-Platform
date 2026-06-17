@@ -2,7 +2,7 @@ use crate::protocol;
 use crate::runtime;
 use crate::store;
 use serde_json::{json, Value};
-use std::os::unix::net::UnixStream;
+use std::io::Write;
 
 const REQUEST_FAILED: &str = "request_failed";
 
@@ -22,7 +22,7 @@ pub(super) fn handle_add_message(
 pub(super) fn handle_add_message_streaming(
     inbound: &protocol::EnvelopeIn,
     runtime_paths: &runtime::RuntimePaths,
-    writer: &mut UnixStream,
+    writer: &mut dyn Write,
     correlation_id: &str,
     schema_version: u32,
 ) {

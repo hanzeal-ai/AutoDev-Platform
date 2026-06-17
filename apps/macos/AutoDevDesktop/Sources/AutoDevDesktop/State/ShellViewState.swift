@@ -37,7 +37,7 @@ struct ShellViewState {
     var protocolVersion: String
     var deepseekStatusLine: String
     var lastError: String
-    var daemonSocketPath: String
+    var daemonAPIBaseURL: String
     var statusMessage: String
 
     var selectedProject: DeliveryProjectItem? {

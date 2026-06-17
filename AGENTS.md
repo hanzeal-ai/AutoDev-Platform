@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mac-first AI-driven software delivery platform. SwiftUI/AppKit frontend communicates with a Rust daemon over Unix domain socket IPC using line-delimited JSON envelopes.
+Mac-first AI-driven software delivery platform. SwiftUI/AppKit frontend communicates with a Rust backend API over HTTP RPC using JSON envelopes.
 
 Architecture docs: [01-System-Blueprint-v0.1.md](01-System-Blueprint-v0.1.md) → [02-Core-Domain-Model-v0.1.md](02-Core-Domain-Model-v0.1.md) → [03-Command-Event-Catalog-v0.1.md](03-Command-Event-Catalog-v0.1.md) → [04-SwiftUI-Rust-Process-Communication-v0.1.md](04-SwiftUI-Rust-Process-Communication-v0.1.md)
 
@@ -10,7 +10,7 @@ Architecture docs: [01-System-Blueprint-v0.1.md](01-System-Blueprint-v0.1.md) �
 
 | Layer | Path | Language | Responsibility |
 |-------|------|----------|----------------|
-| macOS App | `apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/` | Swift 5.5+ / SwiftUI | UI shell, state, IPC client |
+| macOS App | `apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/` | Swift 5.5+ / SwiftUI | UI shell, state, HTTP API client |
 | Rust Daemon | `core/daemon/src/` | Rust 2021 | Business logic, SQLite, AI integration |
 | Scripts | `scripts/` | Bash | Dev tooling, log routing |
 | Architecture Docs | `*.md` (root) | Markdown | System design specs |
@@ -54,10 +54,10 @@ Target: macOS 12+. Use SwiftUI Preview in `ContentView.swift` for fast UI iterat
 
 ## Architecture Conventions
 
-### IPC Protocol
+### Backend RPC Protocol
 
-- Transport: Unix domain socket at `~/Library/Application Support/com.sanmws.autodev/ipc/daemon.sock`
-- Format: Line-delimited JSON with envelope wrapper (see [04-SwiftUI-Rust-Process-Communication-v0.1.md](04-SwiftUI-Rust-Process-Communication-v0.1.md))
+- Transport: HTTP RPC at `AUTODEV_API_BASE_URL` (default `http://127.0.0.1:7373`)
+- Format: JSON envelope wrapper over `POST /rpc`; streaming commands return newline-delimited JSON envelopes.
 - Schema version: `1`
 - Message types defined in `core/daemon/src/protocol/constants.rs` (Rust) and `Sources/AutoDevDesktop/Services/IPC/Contract/` (Swift) — keep both in sync
 - Queries are read-only (`query.*`), commands are writes (`command.*`)
@@ -92,7 +92,6 @@ See [09-Development-Orchestration-Workflow-v0.1.md](09-Development-Orchestration
 
 ```
 ~/Library/Application Support/com.sanmws.autodev/
-├── ipc/daemon.sock    # Unix socket
 ├── data/app.db        # SQLite database
 └── blobs/             # File storage
 ```

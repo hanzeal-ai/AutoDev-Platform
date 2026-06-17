@@ -8,37 +8,28 @@ extension DaemonClient {
         timeoutSeconds: TimeInterval = 5,
         decode: @escaping @Sendable ([String: Any]) throws -> T
     ) async throws -> T {
-        try await withCheckedThrowingContinuation { [self] continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let responsePayload = try self.sendRequestSync(
-                        messageType: messageType,
-                        payload: payload,
-                        expectedResponse: expectedResponse,
-                        timeoutSeconds: timeoutSeconds
-                    )
-                    let value = try decode(responsePayload)
-                    continuation.resume(returning: value)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let responsePayload = try await sendRequest(
+            messageType: messageType,
+            payload: payload,
+            expectedResponse: expectedResponse,
+            timeoutSeconds: timeoutSeconds
+        )
+        return try decode(responsePayload)
     }
 
-    func sendRequestSync(
+    func sendRequest(
         messageType: String,
         payload: [String: Any],
         expectedResponse: String,
         timeoutSeconds: TimeInterval = 5
-    ) throws -> [String: Any] {
-        let line = try Self.encodeRequestLine(messageType: messageType, payload: payload)
-        let responseLine = try DaemonUnixSocketTransport.exchange(
-            line: line,
-            socketPath: socketPath,
+    ) async throws -> [String: Any] {
+        let body = try Self.encodeRequestBody(messageType: messageType, payload: payload)
+        let responseBody = try await DaemonHTTPTransport.exchange(
+            body: body,
+            baseURL: apiBaseURL,
             timeoutSeconds: timeoutSeconds
         )
-        return try decodeResponsePayload(responseLine, expectedResponse: expectedResponse)
+        return try decodeResponsePayload(responseBody, expectedResponse: expectedResponse)
     }
 
     func decodeResponsePayload(_ line: Data, expectedResponse: String) throws -> [String: Any] {

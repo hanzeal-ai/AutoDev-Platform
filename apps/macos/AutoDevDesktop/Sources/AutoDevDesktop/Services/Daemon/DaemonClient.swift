@@ -1,14 +1,18 @@
 import Foundation
 
 final class DaemonClient: @unchecked Sendable {
-    let socketPath: String
+    let apiBaseURL: URL
 
-    init(socketPath: String = DaemonClient.defaultSocketPath()) {
-        self.socketPath = socketPath
+    init(apiBaseURL: URL = DaemonClient.defaultAPIBaseURL()) {
+        self.apiBaseURL = apiBaseURL
     }
 
-    static func defaultSocketPath() -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return home + "/Library/Application Support/com.sanmws.autodev/ipc/daemon.sock"
+    static func defaultAPIBaseURL() -> URL {
+        if let configured = ProcessInfo.processInfo.environment["AUTODEV_API_BASE_URL"],
+           let url = URL(string: configured),
+           !configured.isEmpty {
+            return url
+        }
+        return URL(string: "http://127.0.0.1:7373")!
     }
 }

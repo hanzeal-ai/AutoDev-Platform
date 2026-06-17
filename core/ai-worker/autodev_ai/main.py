@@ -199,7 +199,7 @@ async def generate_chat_stream_endpoint(ctx: ChatContext):
     async def event_generator():
         try:
             # Timeout slightly longer than the Rust-side SO_RCVTIMEO (120 s) so
-            # the client sees a clean error event rather than a socket timeout.
+            # the client sees a clean error event rather than a network timeout.
             async with asyncio.timeout(130):
                 async for evt in generate_chat_stream(ctx, cfg):
                     yield evt

@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 #[derive(Clone)]
 pub struct RuntimePaths {
     app_support_root: PathBuf,
-    socket_path: PathBuf,
     data_dir: PathBuf,
     db_path: PathBuf,
     default_blobs_dir: PathBuf,
@@ -17,14 +16,12 @@ pub struct RuntimePaths {
 impl RuntimePaths {
     pub fn discover() -> Result<Self, Box<dyn Error>> {
         let app_support_root = app_support_root()?;
-        let socket_path = app_support_root.join("ipc").join("daemon.sock");
         let data_dir = app_support_root.join("data");
         let db_path = data_dir.join("app.db");
         let default_blobs_dir = app_support_root.join("blobs");
 
         Ok(Self {
             app_support_root,
-            socket_path,
             data_dir,
             db_path,
             default_blobs_dir,
@@ -33,10 +30,6 @@ impl RuntimePaths {
 
     pub fn app_support_root(&self) -> &Path {
         &self.app_support_root
-    }
-
-    pub fn socket_path(&self) -> &Path {
-        &self.socket_path
     }
 
     pub fn db_path(&self) -> &Path {
@@ -54,7 +47,6 @@ impl RuntimePaths {
     pub(crate) fn test_defaults() -> Self {
         Self {
             app_support_root: PathBuf::from("/tmp/autodev-test"),
-            socket_path: PathBuf::from("/tmp/autodev-test/ipc/daemon.sock"),
             data_dir: PathBuf::from("/tmp/autodev-test/data"),
             db_path: PathBuf::from("/tmp/autodev-test/data/app.db"),
             default_blobs_dir: PathBuf::from("/tmp/autodev-test/blobs"),
@@ -62,12 +54,8 @@ impl RuntimePaths {
     }
 
     pub fn ensure_runtime_dirs(&self) -> Result<(), Box<dyn Error>> {
-        let dir = self
-            .socket_path
-            .parent()
-            .ok_or_else(|| "socket path has no parent".to_string())?;
-        fs::create_dir_all(dir)?;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
+        fs::create_dir_all(&self.app_support_root)?;
+        fs::set_permissions(&self.app_support_root, fs::Permissions::from_mode(0o700))?;
         fs::create_dir_all(&self.data_dir)?;
         fs::create_dir_all(&self.blobs_dir())?;
         Ok(())

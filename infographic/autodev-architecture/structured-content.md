@@ -7,7 +7,7 @@ AI-AutoDev-Platform — Mac 原生 AI 软件交付平台架构全解析
 ## Learning Objectives
 
 1. 掌握三层运行时拓扑（Swift App / Rust Daemon / Python AI Worker）
-2. 理解 Unix Socket IPC 协议设计（信封模式、流式与单次请求）
+2. 理解 HTTP RPC 协议设计（信封模式、流式与单次请求）
 3. 了解 AI 请求管线（SSE 流式、LangGraph 图、DeepSeek API）
 4. 理解软件交付全生命周期阶段及其数据流转
 
@@ -26,13 +26,13 @@ AI-AutoDev-Platform — Mac 原生 AI 软件交付平台架构全解析
 **Layer 1: macOS App (Swift/SwiftUI)**
 
 - SwiftUI Views + MVVM (ShellViewModel / ShellViewState)
-- DaemonClient — Unix Socket IPC 客户端
+- DaemonClient — HTTP RPC 客户端
 - AsyncStream — 流式事件消费
 - 运行在主进程，不做业务逻辑
 
 **Layer 2: Rust Core Daemon**
 
-- Unix Domain Socket 服务器（`~/Library/.../ipc/daemon.sock`）
+- HTTP RPC 服务器（默认 `http://127.0.0.1:7373`，服务端部署可配置绑定地址）
 - Router → dispatch_query / dispatch_command 分支
 - Store — SQLite WAL 模式（projects / threads / messages / reports / artifacts / events）
 - AI Worker 客户端（HTTP → localhost:9720）
@@ -50,40 +50,40 @@ AI-AutoDev-Platform — Mac 原生 AI 软件交付平台架构全解析
 - SQLite app.db（结构化数据 + 事件溯源）
 - blobs/（材料文件 + 阶段产物）
 
-**IPC 协议**
+**HTTP RPC 协议**
 
-- 格式：行分隔 JSON，信封模式（schema_version=1）
+- 格式：普通请求为 JSON 信封，流式请求为 JSON Lines 信封（schema_version=1）
 - 类型：query.*只读 / command.* 写操作 / event.* 推送
-- 流式：command.add_creation_message_stream → SSE delta/done/error
+- 流式：command.add_creation_message_stream → JSON Lines delta/done/error
 
 ---
 
-## Diagram 2 — IPC 消息流（请求-响应 + 流式）
+## Diagram 2 — HTTP RPC 消息流（请求-响应 + 流式）
 
-### Title: IPC 通信流程
+### Title: HTTP RPC 通信流程
 
 ### Key Concept
 
-SwiftUI 永不直接访问数据——所有读写通过 DaemonClient 经 Unix Socket 发给 Rust Daemon。
+SwiftUI 永不直接访问数据——所有读写通过 DaemonClient 经 HTTP RPC 发给 Rust Backend API。
 
 ### Sections
 
 **普通请求-响应流程（6步）**
 
 1. SwiftUI View 触发 ViewModel 方法（@MainActor）
-2. ViewModel 调用 DaemonClientDecoding（.userInitiated GCD queue）
-3. DaemonUnixSocketTransport 建立 AF_UNIX 连接，发送 JSON 信封
-4. Rust Server 接收行 → Router 分发到 dispatch_query 或 dispatch_command
+2. ViewModel 调用 DaemonClientDecoding（async/await）
+3. DaemonHTTPTransport 发送 `POST /rpc` JSON 信封
+4. Rust HTTP Server 解析请求 → Router 分发到 dispatch_query 或 dispatch_command
 5. Store 执行 SQLite 查询或写入，返回 Result<T, String>
-6. 响应信封序列化回写 → Swift 解码 → @MainActor 更新 State
+6. 响应信封序列化为 JSON → Swift 解码 → @MainActor 更新 State
 
 **流式请求流程（SSE）**
 
 1. Swift 发送 command.add_creation_message_stream
-2. Rust 检测到 is_streaming_command → 保持 UnixStream 写端开放
+2. Rust 检测到 is_streaming_command → 返回 JSON Lines 流
 3. Daemon 调用 Python Worker SSE 端点（asyncio.timeout=130s）
 4. Worker 从 LangGraph 接收 delta → 序列化为 JSON → 推送 event.creation_message.delta
-5. Swift CancellableSocket 接收 delta → AsyncStream 推送 → UI 实时更新
+5. Swift HTTP stream task 接收 delta → AsyncStream 推送 → UI 实时更新
 6. 流结束：event.creation_message.done；异常：event.creation_message.error
 
 **关键设计点**

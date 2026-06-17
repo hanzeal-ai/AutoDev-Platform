@@ -10,7 +10,7 @@ graph TB
     subgraph PANEL2["📡 第2格：App 找 Daemon 帮忙"]
         direction LR
         APP2["🍎 macOS App\n\n嘿 Daemon！\n用户想创建一个\n新项目，帮忙处理"]
-        PIPE["🔌 Unix Socket\n\n&laquo;IPC 管道&raquo;\n行分隔 JSON\n信封模式 📨"]
+        PIPE["🌐 HTTP RPC\n\n&laquo;服务端接口&raquo;\nJSON 信封\n流式 JSON Lines 📨"]
         DAEMON["🦀 Rust Daemon\n&laquo;核心大脑&raquo;\n\n放心交给我！\n我负责所有\n业务逻辑 💪"]
         APP2 -->|"请求信封"| PIPE
         PIPE -->|"路由分发"| DAEMON

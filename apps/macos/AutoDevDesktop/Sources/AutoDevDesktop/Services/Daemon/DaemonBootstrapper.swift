@@ -1,6 +1,13 @@
 import Foundation
 
 enum DaemonBootstrapper {
+    static func shouldLaunchLocalServices(apiBaseURL: URL = DaemonClient.defaultAPIBaseURL()) -> Bool {
+        guard let host = apiBaseURL.host?.lowercased() else {
+            return false
+        }
+        return host == "127.0.0.1" || host == "localhost" || host == "::1"
+    }
+
     static func launchIfNeeded() -> Bool {
         guard let scriptURL = locateScript("scripts/dev-daemon.sh") else {
             StructuredLogWriter.write(component: "autodev-app", level: "ERROR", message: "missing daemon script")

@@ -1,9 +1,9 @@
 import Foundation
 
 extension ShellViewState {
-    static func initial(socketPath: String) -> ShellViewState {
+    static func initial(apiBaseURL: URL) -> ShellViewState {
         empty(
-            socketPath: socketPath,
+            apiBaseURL: apiBaseURL,
             daemonStatus: "Unknown",
             daemonVersion: "-",
             protocolVersion: "-",
@@ -12,9 +12,9 @@ extension ShellViewState {
         )
     }
 
-    static func preview(socketPath: String) -> ShellViewState {
+    static func preview(apiBaseURL: URL) -> ShellViewState {
         empty(
-            socketPath: socketPath,
+            apiBaseURL: apiBaseURL,
             daemonStatus: "PREVIEW",
             daemonVersion: "-",
             protocolVersion: "-",
@@ -24,7 +24,7 @@ extension ShellViewState {
     }
 
     private static func empty(
-        socketPath: String,
+        apiBaseURL: URL,
         daemonStatus: String,
         daemonVersion: String,
         protocolVersion: String,
@@ -67,7 +67,7 @@ extension ShellViewState {
             protocolVersion: protocolVersion,
             deepseekStatusLine: "DeepSeek 未配置",
             lastError: lastError,
-            daemonSocketPath: socketPath,
+            daemonAPIBaseURL: apiBaseURL.absoluteString,
             statusMessage: statusMessage
         )
     }

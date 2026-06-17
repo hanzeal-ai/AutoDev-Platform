@@ -64,9 +64,13 @@ extension DaemonClient {
         return payload
     }
 
-    static func encodeRequestLine(messageType: String, payload: [String: Any]) throws -> Data {
+    static func encodeRequestBody(messageType: String, payload: [String: Any]) throws -> Data {
         let request = IPCRequestEnvelope.make(messageType: messageType, payload: payload)
-        let body = try JSONSerialization.data(withJSONObject: request.jsonObject(), options: [])
+        return try JSONSerialization.data(withJSONObject: request.jsonObject(), options: [])
+    }
+
+    static func encodeRequestLine(messageType: String, payload: [String: Any]) throws -> Data {
+        let body = try encodeRequestBody(messageType: messageType, payload: payload)
         var out = body
         out.append(contentsOf: [0x0A])
         return out

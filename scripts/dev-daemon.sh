@@ -86,4 +86,5 @@ if [[ -z "${CARGO_BIN:-}" ]]; then
 fi
 
 "$CARGO_BIN" build --manifest-path "$DAEMON_MANIFEST" >>"$ROOT_DIR/logs/$LOG_BASE/combined.log" 2>&1
-nohup "$DAEMON_BIN" >>"$ROOT_DIR/logs/$LOG_BASE/combined.log" 2>&1 &
+echo "Starting autodev-daemon HTTP server on ${AUTODEV_BIND_ADDR:-127.0.0.1:7373}" >>"$ROOT_DIR/logs/$LOG_BASE/combined.log"
+exec "$DAEMON_BIN" >>"$ROOT_DIR/logs/$LOG_BASE/combined.log" 2>&1

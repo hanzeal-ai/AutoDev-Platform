@@ -1,7 +1,7 @@
 import Foundation
 
 protocol DaemonQuerying {
-    var socketPath: String { get }
+    var apiBaseURL: URL { get }
     func getHealth() async throws -> DaemonHealth
     func getOverview() async throws -> DaemonOverviewPayload
     func listProjects() async throws -> [DaemonProject]

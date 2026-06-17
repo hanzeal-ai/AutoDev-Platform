@@ -3,7 +3,7 @@ sequenceDiagram
     participant V as 🖥️ SwiftUI View
     participant VM as ⚙️ ShellViewModel
     participant DC as 📡 DaemonClient
-    participant SK as 🔌 Unix Socket
+    participant API as 🌐 HTTP RPC
     participant SV as 🦀 Rust Server
     participant RT as 🔀 Router
     participant ST as 🗄️ Store / SQLite
@@ -14,14 +14,14 @@ sequenceDiagram
 
     V->>VM: 触发操作 (@MainActor)
     VM->>DC: async 方法调用
-    DC->>SK: IPCRequestEnvelope (JSON行)
-    SK->>SV: read_line() 反序列化
+    DC->>API: POST /rpc JSON Envelope
+    API->>SV: parse request body
     SV->>RT: dispatch(message_type)
     RT->>ST: query / command 执行
     ST-->>RT: StoreResult<T>
     RT-->>SV: EnvelopeOut::success(payload)
-    SV-->>SK: 序列化写回
-    SK-->>DC: 读取响应行
+    SV-->>API: JSON envelope response
+    API-->>DC: HTTP response body
     DC-->>VM: 解码 DTO
     VM->>VM: state.apply(...) @MainActor
     VM-->>V: UI 更新
@@ -30,21 +30,21 @@ sequenceDiagram
 
     V->>VM: 发送消息 (流式)
     VM->>DC: addCreationMessageStreaming()
-    DC->>SK: command.add_creation_message_stream
-    SK->>SV: is_streaming_command = true
+    DC->>API: command.add_creation_message_stream
+    API->>SV: is_streaming_command = true
     SV->>RT: route_streaming_request(stream)
     RT->>ST: SAVEPOINT — 写入用户消息
     RT->>AW: POST /generate/chat/stream
     AW->>DS: LangGraph SSE 调用
     DS-->>AW: token stream
     AW-->>RT: event: delta {content}
-    RT-->>SK: event.creation_message.delta
-    SK-->>DC: AsyncStream<CreationStreamEvent>
+    RT-->>API: event.creation_message.delta
+    API-->>DC: JSON Lines stream
     DC-->>VM: .delta → updateTransientMessage
     VM-->>V: 实时 UI 增量渲染
     AW-->>RT: event: result {full_reply}
     RT->>ST: SAVEPOINT — 写入 AI 消息 (ai_now)
-    RT-->>SK: event.creation_message.done
-    SK-->>DC: stream end
+    RT-->>API: event.creation_message.done
+    API-->>DC: stream end
     DC-->>VM: .done → clearTransient
     VM-->>V: 最终消息显示

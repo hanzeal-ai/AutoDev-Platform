@@ -1,7 +1,7 @@
 import Foundation
 
 private struct PreviewDaemonClient: DaemonQuerying {
-    let socketPath = DaemonClient.defaultSocketPath()
+    let apiBaseURL = DaemonClient.defaultAPIBaseURL()
 
     func getHealth() async throws -> DaemonHealth {
         DaemonHealth(
@@ -48,7 +48,7 @@ private struct PreviewDaemonClient: DaemonQuerying {
     }
 
     func addCreationMessageStreaming(threadID _: String, content _: String) -> CreationStreamingHandle {
-        let handle = CreationStreamingHandle(cancelHandle: CancellableSocket())
+        let handle = CreationStreamingHandle()
         handle.stream = AsyncStream { continuation in
             continuation.yield(.delta("Preview streaming response"))
             continuation.yield(.done(DaemonCommandResult(threadId: nil, projectId: nil, addedCount: nil, assistantMessage: "Preview streaming response", reportDraft: nil)))
@@ -85,7 +85,7 @@ extension ShellViewModel {
             daemonClient: daemonClient,
             dataMode: .sampleOnly,
             autoHealthCheck: false,
-            initialState: .preview(socketPath: daemonClient.socketPath)
+            initialState: .preview(apiBaseURL: daemonClient.apiBaseURL)
         )
     }
 }
