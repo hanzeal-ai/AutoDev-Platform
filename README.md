@@ -27,6 +27,8 @@ These should be designed after the bounded contexts and event contracts are stab
   - Native macOS shell app (`SwiftUI + AppKit`).
 - `core/daemon`
   - Rust backend API that owns runtime boundary and exposes HTTP RPC, including the structured stage-detail payload used by the shell.
+- `core/ai-worker`
+  - Python AI Worker that owns LLM workflow orchestration, LangGraph execution, and pluggable coding providers such as OpenSpec.
 - `scripts/dev-preview.sh`
   - Starts the daemon and opens the Xcode project for normal macOS development.
 - `scripts/dev-daemon.sh`
@@ -48,6 +50,10 @@ These should be designed after the bounded contexts and event contracts are stab
   - Runtime paths and daemon-owned runtime metadata.
 - `core/daemon/src/main.rs`
   - Process entrypoint and request routing.
+- `core/ai-worker/`
+  - AI workflow service only: prompt execution, workflow events, graph orchestration, and coding-provider integration. It must not own UI state, durable project persistence, or daemon domain rules.
+- `docs/`
+  - Private local design material and diagrams. This directory is intentionally ignored and should not be published from the shared repository.
 
 ## Standard macOS Development Flow
 

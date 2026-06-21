@@ -16,6 +16,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
 from ..config import ModelConfig
+from ..json_tools import extract_json_fallback as _extract_json_fallback
 from ..llm import create_llm
 from ..retry import retry_async
 from ..models import (
@@ -263,29 +264,3 @@ def _capped_strings(items: list, limit: int) -> list[str]:
         if text:
             result.append(text)
     return result
-
-
-def _extract_json_fallback(raw: str) -> dict | None:
-    import re
-    raw = raw[:65536]
-    m = re.search(r"```(?:json)?[ \t]*\n(.+?)\n[ \t]*```", raw, re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(1))
-        except json.JSONDecodeError:
-            pass
-    start = raw.find("{")
-    if start < 0:
-        return None
-    depth = 0
-    for i in range(start, len(raw)):
-        if raw[i] == "{":
-            depth += 1
-        elif raw[i] == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(raw[start : i + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None

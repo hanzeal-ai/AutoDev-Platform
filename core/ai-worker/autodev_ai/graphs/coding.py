@@ -16,8 +16,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
 from ..config import ModelConfig
+from ..json_tools import extract_json_fallback as _extract_json_fallback
 from ..llm import create_llm
 from ..retry import retry_async
+from ..text_tools import deduped_string_list as _string_list
 from ..models import CodingContext, CodingResult, CodeFile
 from ..prompts import (
     coding_planner_system_prompt,
@@ -265,44 +267,3 @@ def _normalize_openspec_tasks(raw) -> list[dict]:
             "archived": bool(item.get("archived")),
         })
     return tasks
-
-
-def _string_list(raw, limit: int, max_len: int) -> list[str]:
-    if not isinstance(raw, list):
-        return []
-    result: list[str] = []
-    for item in raw:
-        if not isinstance(item, str):
-            continue
-        value = item.strip()[:max_len]
-        if value and value not in result:
-            result.append(value)
-        if len(result) >= limit:
-            break
-    return result
-
-
-def _extract_json_fallback(raw: str) -> dict | None:
-    import re
-    raw = raw[:65536]
-    m = re.search(r"```(?:json)?[ \t]*\n(.+?)\n[ \t]*```", raw, re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(1))
-        except json.JSONDecodeError:
-            pass
-    start = raw.find("{")
-    if start < 0:
-        return None
-    depth = 0
-    for i in range(start, len(raw)):
-        if raw[i] == "{":
-            depth += 1
-        elif raw[i] == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(raw[start : i + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None

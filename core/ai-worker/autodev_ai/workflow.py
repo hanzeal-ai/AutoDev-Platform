@@ -19,6 +19,7 @@ from .graphs.coding import CodingState, build_coding_graph
 from .graphs.development import DevState, build_development_graph
 from .graphs.prd import PRDState, build_prd_graph
 from .graphs.report import generate_report
+from .json_tools import extract_json_fallback as _extract_json_fallback
 from .llm import create_llm
 from .models import (
     ChatContext,
@@ -35,6 +36,7 @@ from .prompts import (
     prd_review_user_prompt,
 )
 from .retry import retry_async
+from .text_tools import string_list as _string_list
 from .tracing import build_trace_config
 
 
@@ -1393,42 +1395,3 @@ def _required(state: AutoDevWorkflowState, field: str) -> str:
     if not value:
         raise ValueError(f"workflow state missing required field: {field}")
     return value
-
-
-def _string_list(raw, limit: int, max_len: int) -> list[str]:
-    if not isinstance(raw, list):
-        return []
-    result: list[str] = []
-    for item in raw[:limit]:
-        value = str(item).strip()[:max_len]
-        if value:
-            result.append(value)
-    return result
-
-
-def _extract_json_fallback(raw: str) -> dict[str, Any] | None:
-    import re
-
-    raw = raw[:65536]
-    match = re.search(r"```(?:json)?[ \t]*\n(.+?)\n[ \t]*```", raw, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-
-    start = raw.find("{")
-    if start < 0:
-        return None
-    depth = 0
-    for idx, char in enumerate(raw[start:], start):
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(raw[start : idx + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None

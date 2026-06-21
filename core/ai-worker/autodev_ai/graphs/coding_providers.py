@@ -27,6 +27,7 @@ from ..config import ModelConfig
 from ..llm import create_llm
 from ..models import CodingContext
 from ..retry import retry_async
+from ..text_tools import deduped_string_list as _string_list
 from ..tracing import build_trace_config
 
 OPENSPEC_FLOW_STEPS: dict[str, str] = {
@@ -499,19 +500,6 @@ def _read_skill(roots: list[Path | None], skill_name: str) -> str:
     )
 
 
-def _string_list(raw: Any, limit: int, max_len: int) -> list[str]:
-    if not isinstance(raw, list):
-        return []
-    result: list[str] = []
-    for item in raw:
-        if not isinstance(item, str):
-            continue
-        value = item.strip()[:max_len]
-        if value and value not in result:
-            result.append(value)
-        if len(result) >= limit:
-            break
-    return result
 
 
 def _write_change_docs(project_root: Path, docs: Mapping[str, str]) -> Path:

@@ -12,10 +12,12 @@ Architecture docs: [01-System-Blueprint-v0.1.md](01-System-Blueprint-v0.1.md) â†
 |-------|------|----------|----------------|
 | macOS App | `apps/macos/AutoDevDesktop/Sources/AutoDevDesktop/` | Swift 5.5+ / SwiftUI | UI shell, state, HTTP API client |
 | Rust Daemon | `core/daemon/src/` | Rust 2021 | Business logic, SQLite, AI integration |
+| AI Worker | `core/ai-worker/` | Python | LLM workflow, LangGraph orchestration, OpenSpec coding provider, AI Worker HTTP service |
 | Scripts | `scripts/` | Bash | Dev tooling, log routing |
-| Architecture Docs | `*.md` (root) | Markdown | System design specs |
+| Private Design Docs | `docs/` | Markdown / diagrams | Local project design notes; ignored and not published |
 
 Never put business logic in the Swift layer. The daemon owns all domain rules and write paths.
+Do not put persistence ownership or UI state into the AI Worker. It should return structured AI outputs and workflow events to the daemon.
 
 ## Build and Test
 
@@ -51,6 +53,15 @@ cd apps/macos/AutoDevDesktop && swift build
 ```
 
 Target: macOS 12+. Use SwiftUI Preview in `ContentView.swift` for fast UI iteration without the daemon.
+
+### AI Worker
+
+```bash
+# Run tests
+core/ai-worker/.venv/bin/pytest core/ai-worker/tests -q
+```
+
+Requires model credentials from local `.env`. The worker may create local OpenSpec assets under `docs/` or `openspec/` while coding, but API keys and local generated caches must remain uncommitted.
 
 ## Architecture Conventions
 
