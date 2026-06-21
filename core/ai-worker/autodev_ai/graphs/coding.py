@@ -1,7 +1,7 @@
 """LangGraph coding generation workflow (development sub-step 2).
 
 Graph topology:
-    planner_node ──▶ coding_agent_node (streaming) ──▶ synthesizer_node ──▶ normalizer_node
+    planner_node ──▶ document_provider_node ──▶ synthesizer_node ──▶ normalizer_node
 
 Produces a structured CodingResult with implementation code files.
 """
@@ -22,12 +22,11 @@ from ..models import CodingContext, CodingResult, CodeFile
 from ..prompts import (
     coding_planner_system_prompt,
     coding_planner_user_prompt,
-    coding_agent_system_prompt,
-    coding_agent_user_prompt,
     CODING_SYNTHESIZER_SYSTEM,
     coding_synthesizer_user_prompt,
 )
 from ..tracing import build_trace_config
+from .coding_providers import CodingProvider, provider_from_env
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +37,7 @@ class CodingState(TypedDict, total=False):
     config: ModelConfig
     coding_plan: list[dict]
     coding_reply: str
+    openspec_tasks: list[dict]
     deltas: list[str]
     structured: dict
     result: CodingResult
@@ -78,50 +78,40 @@ async def planner_node(state: CodingState) -> dict:
     return {"coding_plan": _normalize_coding_plan(raw)}
 
 
-async def coding_agent_node(state: CodingState) -> dict:
-    """Stage 2: streaming coding agent — produces implementation narrative."""
+async def document_provider_node(
+    state: CodingState,
+    provider: CodingProvider | None = None,
+) -> dict:
+    """Stage 2: document-driven coding provider — OpenSpec by default."""
     ctx = state["context"]
     cfg = state["config"]
 
-    llm = create_llm(cfg, max_tokens=4000, streaming=True)
-
-    task_breakdown_text = json.dumps(ctx.task_breakdown, ensure_ascii=False)
-    coding_plan_text = json.dumps(state.get("coding_plan", []), ensure_ascii=False)
-
-    messages = [
-        SystemMessage(content=coding_agent_system_prompt()),
-        HumanMessage(content=coding_agent_user_prompt(
-            ctx.project_name, task_breakdown_text, coding_plan_text,
-        )),
-    ]
-
-    full_reply = ""
-    deltas: list[str] = []
-
-    async def _stream():
-        nonlocal full_reply, deltas
-        full_reply = ""
-        deltas = []
-        async for chunk in llm.astream(
-            messages,
-            config=build_trace_config(
-                "coding_agent",
-                "coding",
-                ctx,
-                prompt_keys=["coding.agent.system", "coding.agent.user"],
-            ),
-        ):
-            delta = chunk.content
-            if delta:
-                full_reply += delta
-                deltas.append(delta)
-
-    await retry_async(_stream)
+    selected_provider = provider or provider_from_env()
+    result = await selected_provider.run(
+        ctx=ctx,
+        cfg=cfg,
+        tasks=state.get("coding_plan", []),
+    )
+    full_reply = str(result.get("coding_reply") or "")
 
     if not full_reply.strip():
-        return {"error": "编码 Agent 返回空内容", "coding_reply": "", "deltas": deltas}
+        return {
+            "error": "文档驱动编码 Provider 返回空内容",
+            "coding_reply": "",
+            "deltas": result.get("deltas", []),
+            "openspec_tasks": result.get("openspec_tasks", []),
+        }
 
-    return {"coding_reply": full_reply, "deltas": deltas}
+    return {
+        "coding_reply": full_reply,
+        "deltas": result.get("deltas", []),
+        "openspec_tasks": result.get("openspec_tasks", []),
+    }
+
+
+async def coding_agent_node(state: CodingState) -> dict:
+    """Backward-compatible alias for the document provider node."""
+    return await document_provider_node(state)
 
 
 async def synthesizer_node(state: CodingState) -> dict:
@@ -192,21 +182,22 @@ async def normalizer_node(state: CodingState) -> dict:
     result = CodingResult(
         summary=raw.get("summary", "")[:4096],
         code_files=code_files,
+        openspec_tasks=_normalize_openspec_tasks(state.get("openspec_tasks", [])),
     )
 
     return {"result": result}
 
 
-def build_coding_graph() -> StateGraph:
+def build_coding_graph(provider: CodingProvider | None = None) -> StateGraph:
     graph = StateGraph(CodingState)
     graph.add_node("planner", planner_node)
-    graph.add_node("coding_agent", coding_agent_node)
+    graph.add_node("document_provider", lambda state: document_provider_node(state, provider))
     graph.add_node("synthesizer", synthesizer_node)
     graph.add_node("normalizer", normalizer_node)
 
     graph.add_edge(START, "planner")
-    graph.add_edge("planner", "coding_agent")
-    graph.add_edge("coding_agent", "synthesizer")
+    graph.add_edge("planner", "document_provider")
+    graph.add_edge("document_provider", "synthesizer")
     graph.add_edge("synthesizer", "normalizer")
     graph.add_edge("normalizer", END)
 
@@ -251,6 +242,29 @@ def _fallback_coding_task() -> dict:
         "acceptance_checks": ["生成的文件路径、模块关系和接口契约保持一致"],
         "implementation_notes": "LLM 未返回有效计划，回退到单步实现。",
     }
+
+
+def _normalize_openspec_tasks(raw) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    tasks: list[dict] = []
+    for item in raw[:20]:
+        if not isinstance(item, dict):
+            continue
+        review_result = item.get("review_result")
+        tasks.append({
+            "task_id": str(item.get("task_id", ""))[:64],
+            "title": str(item.get("title", ""))[:256],
+            "change_id": str(item.get("change_id", ""))[:96],
+            "proposal_md": str(item.get("proposal_md", ""))[:20000],
+            "design_md": str(item.get("design_md", ""))[:20000],
+            "tasks_md": str(item.get("tasks_md", ""))[:20000],
+            "review_iterations": int(item.get("review_iterations") or 0),
+            "review_result": review_result if isinstance(review_result, dict) else {},
+            "archive_note": str(item.get("archive_note", ""))[:4096],
+            "archived": bool(item.get("archived")),
+        })
+    return tasks
 
 
 def _string_list(raw, limit: int, max_len: int) -> list[str]:

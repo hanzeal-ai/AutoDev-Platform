@@ -306,6 +306,7 @@ class CodingResult(BaseModel):
     """Structured coding result — implementation code files."""
     summary: str = Field(default="", max_length=4096)
     code_files: list[CodeFile] = Field(default_factory=list)
+    openspec_tasks: list[dict] = Field(default_factory=list)
 
 
 class CodingContext(BaseModel):

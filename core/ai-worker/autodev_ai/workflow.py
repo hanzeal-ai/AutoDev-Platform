@@ -605,6 +605,13 @@ async def coding_node(state: AutoDevWorkflowState) -> dict[str, Any]:
     async def run() -> dict[str, Any]:
         cfg = ModelConfig.from_env()
         task_breakdown = dict(state.get("development_plan") or {})
+        task_breakdown["prd"] = state.get("prd_result") or {}
+        task_breakdown["ui_requirements"] = (
+            state.get("ui_requirements")
+            or (state.get("draft") or {}).get("ui_requirements")
+            or (state.get("prd_result") or {}).get("ui_requirements")
+            or {}
+        )
         if _needs_revision(state.get("code_review_result")):
             task_breakdown["code_review_feedback"] = _review_feedback(
                 state.get("code_review_result", {})
@@ -626,12 +633,18 @@ async def coding_node(state: AutoDevWorkflowState) -> dict[str, Any]:
             "structured": {},
             "error": None,
         }
+        worker_result = await _coding_graph.ainvoke(worker_state)
         result = _phase_result(
-            await _coding_graph.ainvoke(worker_state),
+            worker_result,
             "coding_result",
             "coding_complete",
         )
-        result["events"] = _append_event(state, "coding: 代码生成阶段已完成")
+        events = list(state.get("events") or [])
+        for event in worker_result.get("deltas") or []:
+            if isinstance(event, str) and event.strip():
+                events.append(event.strip())
+        events.append("coding: 代码生成阶段已完成")
+        result["events"] = events
         return result
 
     return await _with_node_errors(state, "coding", run)
@@ -1084,6 +1097,8 @@ def _review_reason(review: Any, fallback: str) -> str:
 
 def _workflow_log_status(detail: str) -> str:
     if "准备执行" in detail:
+        return "running"
+    if "正在使用 OpenSpec" in detail or "正在初始化 OpenSpec" in detail:
         return "running"
     if "执行失败" in detail:
         return "failed"

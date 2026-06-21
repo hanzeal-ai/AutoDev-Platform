@@ -54,3 +54,23 @@ LANGSMITH_PROJECT=autodev
 - `DEEPSEEK_BASE_URL` — API 地址（默认 https://api.deepseek.com/v1）
 - `DEEPSEEK_MODEL` — 模型名（默认 deepseek-chat）
 - `AI_WORKER_PORT` — 监听端口（默认 9720）
+- `AUTODEV_CODING_PROVIDER` — 代码实现阶段的文档驱动 provider，默认 `openspec`，可设为 `legacy`
+- `AUTODEV_PROJECT_ROOT` — OpenSpec 文档写入的项目根目录，默认当前工作目录
+- `AUTODEV_TOOLS_DIR` — 自动安装 Node/OpenSpec 的工具目录，默认 `~/.cache/autodev/tools`
+- `AUTODEV_NODE_VERSION` — 自动安装的 Node.js 版本，默认 `v22.12.0`
+
+## OpenSpec
+
+代码实现阶段默认使用官方 OpenSpec Codex skill。AI Worker 会在运行时自动检查：
+
+- Node.js 是否存在且版本不低于 20.19.0
+- `@fission-ai/openspec` 是否已安装
+- 项目内是否存在 `.codex/skills/openspec-*/SKILL.md`
+
+缺失时会自动安装 Node.js、安装 OpenSpec，并在项目根目录执行：
+
+```bash
+openspec init --tools codex --profile core
+```
+
+AI Worker 在 coding graph 中读取官方 skill 指令来执行 `propose -> apply -> archive`。每个 coding task 会先写入 `openspec/changes/<change-id>/proposal.md`、`design.md`、`tasks.md`，任务完成后归档到 `openspec/changes/archive/<date>-<change-id>/`。如果后续要切换为其它文档驱动范式，可以通过 `AUTODEV_CODING_PROVIDER` 接入新的 provider。

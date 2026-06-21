@@ -744,6 +744,43 @@ async def test_report_node_normalizes_insufficient_balance_error(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_coding_node_merges_openspec_step_events(monkeypatch):
+    class FakeCodingGraph:
+        async def ainvoke(self, worker_state):
+            return {
+                "result": {"summary": "ok", "code_files": []},
+                "deltas": [
+                    "coding: 正在使用 OpenSpec 模式生成提案：账号登录",
+                    "coding: 正在使用 OpenSpec 模式生成文档：账号登录",
+                    "coding: 正在使用 OpenSpec 模式执行实现：账号登录",
+                ],
+                "error": None,
+            }
+
+    monkeypatch.setattr("autodev_ai.workflow._coding_graph", FakeCodingGraph())
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test")
+
+    result = await coding_node(
+        {
+            "project_id": "project-1",
+            "project_name": "Demo",
+            "feasibility_report": {"project_name": "Demo"},
+            "prd_result": {"summary": "PRD"},
+            "development_plan": {"summary": "Plan"},
+            "events": ["development: 研发计划已生成"],
+        }
+    )
+
+    assert result["current_phase"] == "coding_complete"
+    assert result["events"][-4:] == [
+        "coding: 正在使用 OpenSpec 模式生成提案：账号登录",
+        "coding: 正在使用 OpenSpec 模式生成文档：账号登录",
+        "coding: 正在使用 OpenSpec 模式执行实现：账号登录",
+        "coding: 代码生成阶段已完成",
+    ]
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("node_name", "node", "graph_attr", "expected_phase"),
     [
