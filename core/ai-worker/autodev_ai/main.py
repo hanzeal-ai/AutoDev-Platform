@@ -65,7 +65,7 @@ async def workflow_start(ctx: WorkflowStartContext):
 async def workflow_resume(ctx: WorkflowResumeContext):
     """Resume a workflow from its latest SQLite checkpoint."""
     try:
-        return await resume_workflow(ctx.workflow_id)
+        return await resume_workflow(ctx.workflow_id, action=ctx.action)
     except RuntimeError:
         raise HTTPException(status_code=503, detail="AI 服务不可用")
     except Exception:

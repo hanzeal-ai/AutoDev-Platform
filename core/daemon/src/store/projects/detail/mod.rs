@@ -16,6 +16,7 @@ impl Store {
         &self,
         project_id: &str,
         feedback: Option<&str>,
+        action: Option<&str>,
     ) -> StoreResult<Value> {
         let project_id = project_id.trim().to_lowercase();
         let project = query::load_project(self, &project_id)?;
@@ -37,6 +38,7 @@ impl Store {
         let project_id_for_task = project_id.clone();
         let active_stage_for_task = active_stage.clone();
         let feedback_for_task = feedback.map(ToString::to_string);
+        let action_for_task = action.map(ToString::to_string);
         let run_id_for_watchdog = run_id.clone();
         let watchdog_paths = self.paths.clone();
         let pid_watchdog = project_id.clone();
@@ -67,6 +69,7 @@ impl Store {
                     &defaults,
                     feasibility.as_ref(),
                     feedback_for_task.as_deref(),
+                    action_for_task.as_deref(),
                 ) {
                     logger::error_fields(
                         "stage agent task failed",

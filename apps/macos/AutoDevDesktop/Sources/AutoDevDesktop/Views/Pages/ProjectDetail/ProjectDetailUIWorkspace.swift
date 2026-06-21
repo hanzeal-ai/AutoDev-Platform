@@ -3,7 +3,7 @@ import SwiftUI
 extension ProjectDetailPage {
     func uiWorkspace(detail: DeliveryExecutionDetail?) -> some View {
         let subSteps = detail?.subSteps ?? []
-        let activeSubStep = resolvedActiveSubStep(detail: detail, subSteps: subSteps) ?? "page_map"
+        let activeSubStep = detail?.activeSubStep ?? subSteps.first?.key ?? "page_map"
 
         return VStack(alignment: .leading, spacing: AutoDevViewTheme.cardSpacing) {
             if activeSubStep == "interaction" {

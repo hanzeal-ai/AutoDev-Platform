@@ -54,10 +54,10 @@ extension DaemonClient {
         ) { _ in true }
     }
 
-    func runProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult {
+    func runProjectWorkflow(projectID: String, feedback: String?, action: String?) async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.runProjectWorkflowCommand,
-            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback),
+            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback, action: action),
             expectedResponse: IPCContract.MessageType.runProjectWorkflowSuccess,
             timeoutSeconds: 900
         ) { payload in
@@ -65,10 +65,10 @@ extension DaemonClient {
         }
     }
 
-    func startProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult {
+    func startProjectWorkflow(projectID: String, feedback: String?, action: String?) async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.startProjectWorkflowCommand,
-            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback),
+            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback, action: action),
             expectedResponse: IPCContract.MessageType.startProjectWorkflowSuccess,
             timeoutSeconds: 900
         ) { payload in
@@ -76,10 +76,10 @@ extension DaemonClient {
         }
     }
 
-    func resumeProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult {
+    func resumeProjectWorkflow(projectID: String, feedback: String?, action: String?) async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.resumeProjectWorkflowCommand,
-            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback),
+            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback, action: action),
             expectedResponse: IPCContract.MessageType.resumeProjectWorkflowSuccess,
             timeoutSeconds: 900
         ) { payload in

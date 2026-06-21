@@ -49,6 +49,16 @@ fn handle_workflow_command(
             .filter(|s| !s.is_empty())
             .map(str::to_string)
     });
+    let action = inbound.payload_object().ok().and_then(|payload| {
+        payload
+            .get("action")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    });
     let store = store::Store::open(runtime_paths)?;
-    Ok((response_type, store.run_project_workflow(&project_id, feedback.as_deref())?))
+    Ok((
+        response_type,
+        store.run_project_workflow(&project_id, feedback.as_deref(), action.as_deref())?,
+    ))
 }

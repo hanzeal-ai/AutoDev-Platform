@@ -202,7 +202,7 @@ WHERE thread_id = ?4
     }
 
     fn trigger_creation_workflow(&self, project_id: &str) -> StoreResult<()> {
-        self.run_project_workflow(project_id, None)
+        self.run_project_workflow(project_id, None, None)
             .map(|_| ())
     }
 

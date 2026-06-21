@@ -83,7 +83,7 @@ extension ShellViewModel {
         state.executionDetails[key] = nil
     }
 
-    func generateAIForSelectedStage(feedback: String? = nil) {
+    func generateAIForSelectedStage(feedback: String? = nil, action: String = "continue") {
         guard dataMode == .liveDaemon else {
             state.statusMessage = "预览模式不能触发后台 AI"
             return
@@ -92,10 +92,10 @@ extension ShellViewModel {
             state.statusMessage = "未选择阶段"
             return
         }
-        guard !isGeneratingStageAI else { return }
+        guard !isGeneratingStageAI || action != "continue" else { return }
 
         isGeneratingStageAI = true
-        state.statusMessage = feedback != nil ? "根据反馈重新生成中..." : "后台 AI 已启动..."
+        state.statusMessage = workflowActionStatusMessage(action: action, hasFeedback: feedback != nil)
         Task { [weak self] in
             guard let self else { return }
             defer { isGeneratingStageAI = false }
@@ -105,12 +105,14 @@ extension ShellViewModel {
                 if shouldStart {
                     _ = try await daemonClient.startProjectWorkflow(
                         projectID: requestKey.projectID.uuidString,
-                        feedback: feedback
+                        feedback: feedback,
+                        action: action
                     )
                 } else {
                     _ = try await daemonClient.resumeProjectWorkflow(
                         projectID: requestKey.projectID.uuidString,
-                        feedback: feedback
+                        feedback: feedback,
+                        action: action
                     )
                 }
                 guard state.selectedExecutionDetailKey == requestKey else { return }
@@ -137,6 +139,15 @@ extension ShellViewModel {
                 state.apply(operationError: error, context: "触发后台 AI")
             }
         }
+    }
+
+    func runSelectedWorkflowStep() {
+        let status = state.selectedWorkflowSnapshot?.status ?? .notStarted
+        generateAIForSelectedStage(action: workflowRunAction(for: status))
+    }
+
+    func skipSelectedWorkflowStep() {
+        generateAIForSelectedStage(action: "skip")
     }
 
     func openLocalPath(_ path: String) {
@@ -167,5 +178,32 @@ extension ShellViewModel {
             return aiRun.isActive
         }
         return false
+    }
+
+    private func workflowRunAction(for status: DeliveryWorkflowNodeStatus) -> String {
+        switch status {
+        case .failed, .blocked, .awaitingUserInput:
+            return "retry"
+        case .running, .completed:
+            return "rerun"
+        case .notStarted, .pending:
+            return "continue"
+        }
+    }
+
+    private func workflowActionStatusMessage(action: String, hasFeedback: Bool) -> String {
+        if hasFeedback {
+            return "根据反馈重新生成中..."
+        }
+        switch action {
+        case "skip":
+            return "正在跳过当前 Workflow 节点..."
+        case "retry":
+            return "正在重试当前 Workflow 节点..."
+        case "rerun":
+            return "正在重新执行当前 Workflow 节点..."
+        default:
+            return "后台 AI 已启动..."
+        }
     }
 }

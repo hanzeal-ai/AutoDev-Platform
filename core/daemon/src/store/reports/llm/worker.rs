@@ -70,10 +70,14 @@ pub(crate) fn request_workflow_events(workflow_id: &str) -> StoreResult<Value> {
     )
 }
 
-pub(crate) fn request_workflow_resume(workflow_id: &str) -> StoreResult<Value> {
+pub(crate) fn request_workflow_resume(workflow_id: &str, action: Option<&str>) -> StoreResult<Value> {
+    let mut body = json!({ "workflow_id": workflow_id });
+    if let Some(action) = action.filter(|value| !value.is_empty()) {
+        body["action"] = json!(action);
+    }
     post_worker_json(
         "/workflow/resume",
-        json!({ "workflow_id": workflow_id }),
+        body,
         Duration::from_secs(900),
         "workflow resume",
     )
@@ -83,10 +87,11 @@ pub(crate) fn request_workflow_start(
     project_id: &str,
     project_name: &str,
     feasibility: Option<&Value>,
+    action: Option<&str>,
 ) -> StoreResult<Value> {
     post_worker_json(
         "/workflow/start",
-        workflow_start_body(project_id, project_name, feasibility),
+        workflow_start_body(project_id, project_name, feasibility, action),
         Duration::from_secs(900),
         "workflow start",
     )
@@ -127,7 +132,12 @@ fn post_worker_json(
         .map_err(|err| format!("解析 AI Worker {operation} JSON 失败: {err}"))
 }
 
-fn workflow_start_body(project_id: &str, project_name: &str, feasibility: Option<&Value>) -> Value {
+fn workflow_start_body(
+    project_id: &str,
+    project_name: &str,
+    feasibility: Option<&Value>,
+    action: Option<&str>,
+) -> Value {
     let report_draft = feasibility
         .and_then(|v| v.get("report_draft"))
         .cloned()
@@ -152,7 +162,7 @@ fn workflow_start_body(project_id: &str, project_name: &str, feasibility: Option
         .cloned()
         .unwrap_or_else(|| json!([]));
 
-    json!({
+    let mut body = json!({
         "workflow_id": project_id,
         "thread_id": thread_id,
         "project_id": project_id,
@@ -161,7 +171,11 @@ fn workflow_start_body(project_id: &str, project_name: &str, feasibility: Option
         "draft": report_draft,
         "messages": [],
         "materials": materials,
-    })
+    });
+    if let Some(action) = action.filter(|value| !value.is_empty()) {
+        body["action"] = json!(action);
+    }
+    body
 }
 
 #[cfg(test)]
@@ -179,18 +193,19 @@ mod workflow_tests {
             "materials": [{"name": "spec.md"}]
         });
 
-        let body = workflow_start_body("project-1", "Demo", Some(&feasibility));
+        let body = workflow_start_body("project-1", "Demo", Some(&feasibility), Some("skip"));
 
         assert_eq!(body["workflow_id"], "project-1");
         assert_eq!(body["thread_id"], "thread-1");
         assert_eq!(body["user_message"], "Build a tool");
         assert_eq!(body["draft"]["project_name"], "Demo");
         assert_eq!(body["materials"][0]["name"], "spec.md");
+        assert_eq!(body["action"], "skip");
     }
 
     #[test]
     fn workflow_start_body_falls_back_to_project_context() {
-        let body = workflow_start_body("project-1", "Demo", None);
+        let body = workflow_start_body("project-1", "Demo", None, None);
 
         assert_eq!(body["workflow_id"], "project-1");
         assert_eq!(body["thread_id"], "project-1");

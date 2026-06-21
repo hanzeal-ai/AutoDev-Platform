@@ -41,10 +41,13 @@ extension DaemonClient {
         ["project_id": projectID]
     }
 
-    static func runProjectWorkflowPayload(projectID: String, feedback: String?) -> [String: Any] {
+    static func runProjectWorkflowPayload(projectID: String, feedback: String?, action: String?) -> [String: Any] {
         var payload: [String: Any] = ["project_id": projectID]
         if let feedback, !feedback.isEmpty {
             payload["feedback"] = feedback
+        }
+        if let action, !action.isEmpty {
+            payload["action"] = action
         }
         return payload
     }

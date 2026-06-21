@@ -340,6 +340,7 @@ class WorkflowStartContext(BaseModel):
     project_id: str
     project_name: str = Field(max_length=256)
     user_message: str = Field(max_length=4096)
+    action: str = Field(default="continue", max_length=32)
     draft: dict = Field(default_factory=dict)
     messages: list[ChatMessage] = Field(default_factory=list)
     materials: list[ChatMaterial] = Field(default_factory=list)
@@ -384,10 +385,19 @@ class WorkflowStartContext(BaseModel):
             raise ValueError("user_message must not be empty")
         return v
 
+    @field_validator("action")
+    @classmethod
+    def validate_start_workflow_action(cls, v: str) -> str:
+        v = v.strip().lower() or "continue"
+        if v not in {"continue", "retry", "rerun", "skip"}:
+            raise ValueError("invalid workflow action")
+        return v
+
 
 class WorkflowResumeContext(BaseModel):
     """Request body for resuming or inspecting a checkpointed workflow."""
     workflow_id: str = Field(max_length=128)
+    action: str = Field(default="continue", max_length=32)
 
     @field_validator("workflow_id")
     @classmethod
@@ -395,6 +405,14 @@ class WorkflowResumeContext(BaseModel):
         v = v.strip()
         if not v or not ID_PATTERN.match(v):
             raise ValueError("invalid workflow_id")
+        return v
+
+    @field_validator("action")
+    @classmethod
+    def validate_workflow_action(cls, v: str) -> str:
+        v = v.strip().lower() or "continue"
+        if v not in {"continue", "retry", "rerun", "skip"}:
+            raise ValueError("invalid workflow action")
         return v
 
 

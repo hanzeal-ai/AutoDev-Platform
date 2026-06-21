@@ -637,6 +637,59 @@ def test_workflow_status_advances_active_step_after_completed_checkpoint():
     assert status["phases"]["report"]["status"] == "running"
 
 
+def test_workflow_status_grays_downstream_after_code_review_revision():
+    status = build_workflow_status(
+        {
+            "workflow_id": "wf-review",
+            "project_id": "project-review",
+            "current_phase": "code_review_revision_required",
+            "development_plan": {"summary": "研发计划"},
+            "coding_result": {"summary": "第一轮代码"},
+            "code_review_iteration": 1,
+            "code_review_result": {
+                "approved": False,
+                "summary": "账号登录模块缺失",
+                "issues": [{"description": "未实现登录 API"}],
+            },
+        }
+    )
+
+    assert status["current_step"] == "coding"
+    assert status["phases"]["coding"]["status"] == "running"
+    assert status["phases"]["coding"]["artifact_id"] == "wf-review:coding"
+    assert status["phases"]["coding"]["name"] == "第 2 轮代码开发"
+    assert status["phases"]["code_review"]["status"] == "pending"
+    assert status["phases"]["code_review"]["artifact_id"] is None
+    assert status["phases"]["code_review"]["name"] == "第 1 轮代码评审"
+    assert status["phases"]["summary"]["status"] == "pending"
+    assert status["phases"]["summary"]["artifact_id"] is None
+
+
+def test_workflow_events_include_blocked_review_reason():
+    payload = build_workflow_events(
+        {
+            "workflow_id": "wf-blocked",
+            "current_phase": "code_review_blocked",
+            "coding_result": {"summary": "代码完成"},
+            "code_review_iteration": 4,
+            "code_review_result": {
+                "approved": False,
+                "summary": "账号模块仍未完成",
+                "required_changes": ["补齐登录 API", "补齐会话持久化"],
+                "issues": [{"description": "缺少权限校验"}],
+            },
+        }
+    )
+
+    event = next(item for item in payload["events"] if item["stage"] == "code_review" and item["type"] == "phase")
+    assert event["status"] == "blocked"
+    assert event["title"] == "第 4 轮代码评审"
+    assert "已达到最大代码评审次数" in event["detail"]
+    assert "代码审核不通过" in event["detail"]
+    assert "账号模块仍未完成" in event["detail"]
+    assert "补齐登录 API" in event["detail"]
+
+
 @pytest.mark.anyio
 async def test_report_node_converts_llm_error_to_failed_state(monkeypatch):
     async def fake_generate_report(ctx, cfg):
@@ -829,7 +882,10 @@ async def test_chat_node_continues_when_existing_draft_is_complete_and_patch_is_
 
     assert result["awaiting_user_input"] is False
     assert result["current_phase"] == "chat_complete"
-    assert result["events"] == ["chat: 需求澄清完成"]
+    assert result["events"] == [
+        "chat: 准备执行需求澄清 Agent",
+        "chat: 需求澄清完成",
+    ]
 
 
 @pytest.mark.anyio
@@ -998,6 +1054,114 @@ async def test_resume_retries_failed_downstream_node(
     assert captured["state"]["current_phase"] == resume_phase
     assert captured["state"]["error"] is None
     assert captured["state"]["events"][-1] == retry_event
+
+
+@pytest.mark.anyio
+async def test_resume_skips_current_node_and_continues(monkeypatch):
+    captured = {}
+    state = {
+        "workflow_id": "wf-skip",
+        "thread_id": "thread-1",
+        "current_phase": "report_complete",
+        "awaiting_user_input": False,
+        "feasibility_report": {"summary": "可行"},
+        "events": ["report: 可行性分析报告已生成"],
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-skip", action="skip")
+
+    assert result == {"workflow_id": "wf-skip", "status": "running"}
+    assert captured["node"] == "prd"
+    assert captured["state"]["current_phase"] == "prd_complete"
+    assert captured["state"]["prd_result"]["skipped"] is True
+    assert captured["state"]["events"][-1] == "prd: 已跳过"
+
+
+@pytest.mark.anyio
+async def test_resume_reruns_current_node_from_previous_checkpoint(monkeypatch):
+    captured = {}
+    state = {
+        "workflow_id": "wf-rerun",
+        "thread_id": "thread-1",
+        "current_phase": "coding_complete",
+        "awaiting_user_input": False,
+        "coding_result": {"summary": "代码已生成"},
+        "events": ["coding: 代码生成阶段已完成"],
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-rerun", action="rerun")
+
+    assert result == {"workflow_id": "wf-rerun", "status": "running"}
+    assert captured["node"] == "coding"
+    assert captured["state"]["current_phase"] == "coding_complete"
+    assert "code_review_result" not in captured["state"]
+    assert captured["state"]["events"][-1] == "code_review: 重新执行"
+
+
+@pytest.mark.anyio
+async def test_resume_retries_blocked_review_node(monkeypatch):
+    captured = {}
+    state = {
+        "workflow_id": "wf-blocked",
+        "thread_id": "thread-1",
+        "current_phase": "code_review_blocked",
+        "awaiting_user_input": False,
+        "code_review_result": {"approved": False},
+        "events": ["code_review: 第 3 轮代码评审阻塞"],
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-blocked", action="retry")
+
+    assert result == {"workflow_id": "wf-blocked", "status": "running"}
+    assert captured["node"] == "coding"
+    assert captured["state"]["current_phase"] == "coding_complete"
+    assert captured["state"]["error"] is None
+    assert captured["state"]["events"][-1] == "code_review: 重新执行"
 
 
 def test_phase_result_raises_on_worker_error_for_checkpoint_resume():

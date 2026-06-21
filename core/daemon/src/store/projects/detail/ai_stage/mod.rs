@@ -17,6 +17,7 @@ pub(super) fn generate_stage_ai_content(
     defaults: &StageDefaults,
     feasibility: Option<&Value>,
     feedback: Option<&str>,
+    action: Option<&str>,
 ) -> StoreResult<bool> {
     request_and_persist_stage_ai_content(
         store,
@@ -27,6 +28,7 @@ pub(super) fn generate_stage_ai_content(
         defaults,
         feasibility,
         feedback,
+        action,
     )
 }
 
@@ -49,8 +51,9 @@ fn request_and_persist_stage_ai_content(
     _defaults: &StageDefaults,
     feasibility: Option<&Value>,
     _feedback: Option<&str>,
+    action: Option<&str>,
 ) -> StoreResult<bool> {
-    request_via_workflow(store, run_id, project_id, project_name, stage, feasibility)
+    request_via_workflow(store, run_id, project_id, project_name, stage, feasibility, action)
 }
 
 fn request_via_workflow(
@@ -60,6 +63,7 @@ fn request_via_workflow(
     project_name: &str,
     stage: &str,
     feasibility: Option<&Value>,
+    action: Option<&str>,
 ) -> StoreResult<bool> {
     insert_stage_event(
         store,
@@ -85,9 +89,9 @@ fn request_via_workflow(
         .map(|status| status == "not_started")
         .unwrap_or_else(|| status.as_object().map(|obj| obj.is_empty()).unwrap_or(true));
     let workflow_status = if not_started {
-        worker::request_workflow_start(project_id, project_name, feasibility)
+        worker::request_workflow_start(project_id, project_name, feasibility, action)
     } else {
-        worker::request_workflow_resume(workflow_id)
+        worker::request_workflow_resume(workflow_id, action)
     };
 
     let workflow_status = match workflow_status {

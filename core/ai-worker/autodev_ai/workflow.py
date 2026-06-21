@@ -152,7 +152,7 @@ _coding_graph = build_coding_graph()
 
 def workflow_config(workflow_id: str) -> dict[str, Any]:
     """Return the LangGraph config that scopes checkpoints to one workflow."""
-    return {"configurable": {"thread_id": workflow_id}}
+    return {"configurable": {"thread_id": workflow_id}, "recursion_limit": 100}
 
 
 def get_workflow_checkpoint_path() -> Path:
@@ -165,12 +165,21 @@ def get_workflow_checkpoint_path() -> Path:
 async def start_workflow(ctx: WorkflowStartContext) -> dict[str, Any]:
     workflow_id = ctx.workflow_id or ctx.thread_id
     state = ctx.model_dump()
+    action = _normalize_workflow_action(str(state.pop("action", "continue")))
     state["workflow_id"] = workflow_id
+    if action == "skip":
+        return await _skip_current_step(state, workflow_id)
+    state = _prepare_node_state(state, "chat")
     return await _invoke_persistent_workflow(state, workflow_id)
 
 
-async def resume_workflow(workflow_id: str) -> dict[str, Any]:
+async def resume_workflow(workflow_id: str, *, action: str = "continue") -> dict[str, Any]:
     state = await _get_checkpoint_state(workflow_id)
+    action = _normalize_workflow_action(action)
+    if action == "skip":
+        return await _skip_current_step(state, workflow_id)
+    if action == "rerun":
+        return await _rerun_current_step(state, workflow_id)
     if _can_continue_from_awaiting_chat(state):
         next_state = dict(state)
         next_state["awaiting_user_input"] = False
@@ -184,6 +193,8 @@ async def resume_workflow(workflow_id: str) -> dict[str, Any]:
             workflow_id,
             retry_after,
         )
+    if action == "retry":
+        return await _rerun_current_step(state, workflow_id)
     resume_after = _resume_node_from_completed_phase(state)
     if resume_after:
         return await _resume_persistent_workflow_after_node(state, workflow_id, resume_after)
@@ -283,7 +294,7 @@ def build_workflow_events(state: Mapping[str, Any]) -> dict[str, Any]:
                 "stage": _event_stage(detail, str(status["current_step"])),
                 "title": "过程事件",
                 "detail": detail[:2048],
-                "status": "completed",
+                "status": _workflow_log_status(detail),
                 "artifact_id": None,
             }
         )
@@ -351,7 +362,11 @@ async def _resume_persistent_workflow_after_node(
     async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
         graph = build_workflow_graph(checkpointer=checkpointer)
         config = workflow_config(workflow_id)
-        await graph.aupdate_state(config, dict(state), as_node=node)
+        await graph.aupdate_state(
+            config,
+            _prepare_node_state(state, _active_step_from_state(state)),
+            as_node=node,
+        )
         result = await graph.ainvoke(None, config=config)
     return build_workflow_status(dict(result or {}))
 
@@ -760,10 +775,162 @@ async def _with_node_errors(
     stage: str,
     run: Callable[[], Awaitable[dict[str, Any]]],
 ) -> dict[str, Any]:
+    started_events = _append_event_once(state, _prepare_event(stage))
     try:
-        return await run()
+        result = await run()
+        result["events"] = _merge_node_events(state, started_events, result.get("events"))
+        return result
     except Exception as exc:
-        return _node_error(state, stage, exc)
+        failed_state = dict(state)
+        failed_state["events"] = started_events
+        return _node_error(failed_state, stage, exc)
+
+
+def _merge_node_events(
+    state: Mapping[str, Any],
+    started_events: list[str],
+    result_events: Any,
+) -> list[str]:
+    if not isinstance(result_events, list):
+        return started_events
+    base_count = len(state.get("events") or [])
+    merged = list(started_events)
+    for event in result_events[base_count:]:
+        if event not in merged:
+            merged.append(str(event))
+    return merged
+
+
+def _agent_title(stage: str) -> str:
+    return {
+        "chat": "需求澄清",
+        "report": "可行性分析",
+        "prd": "产品需求",
+        "prd_review": "需求评审",
+        "development": "研发规划",
+        "coding": "代码生成",
+        "code_review": "代码评审",
+        "summary": "项目总结",
+    }.get(stage, "Workflow")
+
+
+async def _skip_current_step(
+    state: Mapping[str, Any],
+    workflow_id: str,
+) -> dict[str, Any]:
+    stage = _action_stage(state)
+    next_state = _reset_from_stage(state, stage)
+    next_state[WORKFLOW_ARTIFACTS[stage]["state_key"]] = _skipped_artifact(stage, state)
+    next_state["current_phase"] = WORKFLOW_NODE_COMPLETE_PHASE[stage]  # type: ignore[index]
+    next_state["awaiting_user_input"] = False
+    next_state["error"] = None
+    next_state["events"] = _append_event(next_state, f"{stage}: 已跳过")
+    if stage == "summary":
+        return await _save_workflow_state(next_state, workflow_id, "summary")
+    return await _resume_persistent_workflow_after_node(next_state, workflow_id, stage)  # type: ignore[arg-type]
+
+
+async def _rerun_current_step(
+    state: Mapping[str, Any],
+    workflow_id: str,
+) -> dict[str, Any]:
+    stage = _action_stage(state)
+    next_state = _reset_from_stage(state, stage)
+    next_state["awaiting_user_input"] = False
+    next_state["error"] = None
+    next_state["events"] = _append_event(next_state, f"{stage}: 重新执行")
+    if stage == "chat":
+        next_state["current_phase"] = ""
+        return await _invoke_persistent_workflow(_prepare_node_state(next_state, "chat"), workflow_id)
+    previous_node = WORKFLOW_PREVIOUS_NODE[stage]
+    next_state["current_phase"] = WORKFLOW_NODE_COMPLETE_PHASE[previous_node]
+    return await _resume_persistent_workflow_after_node(next_state, workflow_id, previous_node)
+
+
+async def _save_workflow_state(
+    state: AutoDevWorkflowState,
+    workflow_id: str,
+    node: NodeName,
+) -> dict[str, Any]:
+    checkpoint_path = get_workflow_checkpoint_path()
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
+        graph = build_workflow_graph(checkpointer=checkpointer)
+        await graph.aupdate_state(workflow_config(workflow_id), dict(state), as_node=node)
+    return build_workflow_status(state)
+
+
+def _normalize_workflow_action(action: str) -> str:
+    normalized = (action or "continue").strip().lower()
+    if normalized in {"continue", "retry", "rerun", "skip"}:
+        return normalized
+    return "continue"
+
+
+def _action_stage(state: Mapping[str, Any]) -> NodeName:
+    stage = _active_step_from_state(state)
+    if stage in WORKFLOW_ARTIFACTS:
+        return stage  # type: ignore[return-value]
+    return "chat"
+
+
+def _reset_from_stage(state: Mapping[str, Any], stage: str) -> AutoDevWorkflowState:
+    next_state: AutoDevWorkflowState = dict(state)
+    stage_index = WORKFLOW_ORDER.index(stage)
+    for downstream in WORKFLOW_ORDER[stage_index:]:
+        next_state.pop(WORKFLOW_ARTIFACTS[downstream]["state_key"], None)
+    if stage_index <= WORKFLOW_ORDER.index("prd_review"):
+        next_state.pop("prd_review_iteration", None)
+    if stage_index <= WORKFLOW_ORDER.index("code_review"):
+        next_state.pop("code_review_iteration", None)
+    return next_state
+
+
+def _skipped_artifact(stage: str, state: Mapping[str, Any]) -> dict[str, Any]:
+    summary = f"{_agent_title(stage)} Agent 已由用户跳过。"
+    project_name = str(state.get("project_name") or "项目")
+    base: dict[str, Any] = {
+        "status": "skipped",
+        "skipped": True,
+        "summary": summary,
+        "project_name": project_name,
+    }
+    if stage == "chat":
+        return {"assistant_reply": summary, "report_patch": {}, **base}
+    if stage in {"prd_review", "code_review"}:
+        return {
+            **base,
+            "approved": True,
+            "requires_user_input": False,
+            "issues": [],
+            "required_changes": [],
+            "risks": [],
+        }
+    if stage == "coding":
+        return {**base, "code_files": [], "notes": [summary]}
+    if stage == "summary":
+        return {
+            **base,
+            "final_phase": "workflow_complete",
+            "project_id": state.get("project_id", ""),
+        }
+    return base
+
+
+def _prepare_node_state(
+    state: Mapping[str, Any] | None,
+    fallback_stage: str,
+) -> AutoDevWorkflowState:
+    prepared: AutoDevWorkflowState = dict(state or {})
+    stage = _active_step_from_state(prepared)
+    if stage not in WORKFLOW_ARTIFACTS:
+        stage = fallback_stage
+    prepared["events"] = _append_event_once(prepared, _prepare_event(stage))
+    return prepared
+
+
+def _prepare_event(stage: str) -> str:
+    return f"{stage}: 准备执行{_agent_title(stage)} Agent"
 
 
 def _node_error(
@@ -796,10 +963,16 @@ def _exception_message(exc: Exception) -> str:
 
 def _phase_status(state: Mapping[str, Any], workflow_id: str, stage: str) -> dict[str, Any]:
     spec = WORKFLOW_ARTIFACTS[stage]
-    has_artifact = bool(state.get(spec["state_key"]))
     current_step = _active_step_from_state(state)
+    has_artifact = bool(state.get(spec["state_key"]))
+    if _stage_is_stale_after_revision(state, stage, current_step):
+        has_artifact = False
     status = "completed" if has_artifact else "pending"
-    if current_step == stage and not has_artifact:
+    if current_step == stage and _workflow_status(
+        str(state.get("current_phase") or ""),
+        state.get("error"),
+        bool(state.get("awaiting_user_input")),
+    ) == "running":
         status = "running"
     if current_step == stage and state.get("error"):
         status = "failed"
@@ -811,7 +984,7 @@ def _phase_status(state: Mapping[str, Any], workflow_id: str, stage: str) -> dic
     return {
         "status": status,
         "artifact_id": artifact_id,
-        "name": spec["name"],
+        "name": _phase_name(state, stage, str(spec["name"])),
         "kind": spec["kind"],
     }
 
@@ -826,10 +999,99 @@ def _phase_event_detail(stage: str, status: str, state: Mapping[str, Any]) -> st
     if status == "failed":
         return str(state.get("error") or "阶段执行失败")
     if status == "blocked":
-        return "评审未通过或达到自动修复上限"
+        return _blocked_reason(stage, state)
     if stage == "chat":
         return "等待启动需求澄清"
     return "等待上游阶段完成"
+
+
+def _stage_is_stale_after_revision(
+    state: Mapping[str, Any],
+    stage: str,
+    current_step: str,
+) -> bool:
+    if stage not in WORKFLOW_ORDER or current_step not in WORKFLOW_ORDER:
+        return False
+    stage_index = WORKFLOW_ORDER.index(stage)
+    current_index = WORKFLOW_ORDER.index(current_step)
+    if _needs_revision(state.get("prd_review_result")) and current_step == "prd":
+        return stage_index > current_index
+    if _needs_revision(state.get("code_review_result")) and current_step == "coding":
+        return stage_index > current_index
+    return False
+
+
+def _phase_name(state: Mapping[str, Any], stage: str, fallback: str) -> str:
+    if stage == "coding":
+        return f"第 {_coding_round(state)} 轮代码开发"
+    if stage == "code_review":
+        return f"第 {_code_review_round(state)} 轮代码评审"
+    return fallback
+
+
+def _coding_round(state: Mapping[str, Any]) -> int:
+    return max(1, int(state.get("code_review_iteration") or 0) + 1)
+
+
+def _code_review_round(state: Mapping[str, Any]) -> int:
+    completed_reviews = int(state.get("code_review_iteration") or 0)
+    if _active_step_from_state(state) == "code_review" and not state.get("code_review_result"):
+        return max(1, completed_reviews + 1)
+    return max(1, completed_reviews)
+
+
+def _blocked_reason(stage: str, state: Mapping[str, Any]) -> str:
+    if stage == "prd_review":
+        reason = _review_reason(state.get("prd_review_result"), "需求评审未通过")
+        if _review_reached_limit(state, "prd_review"):
+            return f"已达到最大需求评审次数（{_review_limit(state, 'prd_review')} 次），需求评审不通过。{reason}"
+        return reason
+    if stage == "code_review":
+        reason = _review_reason(state.get("code_review_result"), "代码审核不通过")
+        if _review_reached_limit(state, "code_review"):
+            return f"已达到最大代码评审次数（{_review_limit(state, 'code_review')} 次），代码审核不通过。{reason}"
+        return reason
+    return "流程阻塞，等待人工确认或补充处理。"
+
+
+def _review_reached_limit(state: Mapping[str, Any], stage: str) -> bool:
+    iteration_key = f"{stage}_iteration"
+    return int(state.get(iteration_key) or 0) >= _review_limit(state, stage)
+
+
+def _review_limit(state: Mapping[str, Any], stage: str) -> int:
+    if stage == "prd_review":
+        return int(state.get("max_prd_review_iterations") or DEFAULT_MAX_PRD_REVIEW_ITERATIONS)
+    if stage == "code_review":
+        return int(state.get("max_code_review_iterations") or DEFAULT_MAX_CODE_REVIEW_ITERATIONS)
+    return 0
+
+
+def _review_reason(review: Any, fallback: str) -> str:
+    if not isinstance(review, dict):
+        return fallback
+    summary = str(review.get("summary") or "").strip()
+    changes = _string_list(review.get("required_changes"), 3, 160)
+    issues = [
+        str(issue.get("description") or "").strip()
+        for issue in review.get("issues", [])[:3]
+        if isinstance(issue, dict) and str(issue.get("description") or "").strip()
+    ]
+    parts = [summary, *changes, *issues]
+    reason = "；".join(part for part in parts if part)
+    return reason or fallback
+
+
+def _workflow_log_status(detail: str) -> str:
+    if "准备执行" in detail:
+        return "running"
+    if "执行失败" in detail:
+        return "failed"
+    if "阻塞" in detail:
+        return "blocked"
+    if "补充" in detail:
+        return "awaiting_user_input"
+    return "completed"
 
 
 def _event_stage(detail: str, fallback: str) -> str:
@@ -903,9 +1165,9 @@ def _resume_node_from_completed_phase(state: Mapping[str, Any]) -> NodeName | No
     if state.get("error") or state.get("awaiting_user_input"):
         return None
     if current_phase == "prd_review_revision_required":
-        return "prd_review"
+        return "report"
     if current_phase == "code_review_revision_required":
-        return "code_review"
+        return "development"
     if not current_phase.endswith("_complete") or current_phase == "workflow_complete":
         return None
     node = _step_from_phase(current_phase)
@@ -918,9 +1180,12 @@ def _retry_from_failed_phase(
     state: Mapping[str, Any],
 ) -> tuple[AutoDevWorkflowState, NodeName] | None:
     current_phase = str(state.get("current_phase") or "").strip()
-    if not current_phase.endswith("_failed"):
+    if current_phase.endswith("_failed"):
+        failed_stage = current_phase.removesuffix("_failed")
+    elif current_phase.endswith("_blocked"):
+        failed_stage = current_phase.removesuffix("_blocked")
+    else:
         return None
-    failed_stage = current_phase.removesuffix("_failed")
     previous_node = WORKFLOW_PREVIOUS_NODE.get(failed_stage)
     if previous_node is None:
         return None
@@ -1027,6 +1292,13 @@ def _needs_revision(review: dict[str, Any] | None) -> bool:
 def _append_event(state: Mapping[str, Any], detail: str) -> list[str]:
     events = list(state.get("events") or [])
     events.append(detail)
+    return events
+
+
+def _append_event_once(state: Mapping[str, Any], detail: str) -> list[str]:
+    events = list(state.get("events") or [])
+    if not events or events[-1] != detail:
+        events.append(detail)
     return events
 
 

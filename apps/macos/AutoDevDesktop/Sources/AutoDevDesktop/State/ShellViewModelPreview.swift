@@ -90,15 +90,15 @@ private struct PreviewDaemonClient: DaemonQuerying {
 
     func addCreationMaterials(threadID _: String, paths _: [String]) async throws {}
 
-    func runProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
+    func runProjectWorkflow(projectID _: String, feedback _: String?, action _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
 
-    func startProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
+    func startProjectWorkflow(projectID _: String, feedback _: String?, action _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
 
-    func resumeProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
+    func resumeProjectWorkflow(projectID _: String, feedback _: String?, action _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
 

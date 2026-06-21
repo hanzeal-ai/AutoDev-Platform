@@ -7,44 +7,24 @@ struct ProjectDetailPage: View {
         Group {
             if let project = viewModel.state.selectedProject {
                 let detail = viewModel.state.selectedExecutionDetail
-                let subSteps = detail?.subSteps ?? []
-                let activeSubStep = resolvedActiveSubStep(detail: detail, subSteps: subSteps) ?? ""
 
                 VStack(spacing: AutoDevViewTheme.pageSpacing) {
-                    // Decision bar
-                    if let detail {
-                        ProjectDetailDecisionSection(viewModel: viewModel, detail: detail)
-                    } else {
-                        ProjectDetailDecisionFallbackSection(viewModel: viewModel)
-                    }
+                    ProjectWorkflowActionBar(
+                        viewModel: viewModel,
+                        snapshot: viewModel.state.selectedWorkflowSnapshot
+                    )
 
                     ProjectWorkflowOverviewSection(
                         viewModel: viewModel,
                         snapshot: viewModel.state.selectedWorkflowSnapshot,
-                        subSteps: subSteps,
-                        activeSubStep: activeSubStep,
-                        isSubStepDisabled: { step in
-                            isSubStepDisabled(step, detail: detail)
-                        }
+                        detail: detail
                     )
 
-                    // AI execution progress (skip for feasibility chat)
-                    if viewModel.state.activeDetailStage != .feasibility,
-                       let detail
-                    {
-                        StageAIExecutionProgressView(
-                            viewModel: viewModel,
-                            stage: viewModel.state.activeDetailStage,
-                            detail: detail,
-                            downloads: viewModel.state.selectedStageDownloads
-                        )
-                    }
-
-                    // Stage workspace — full width for all stages
-                    DashboardCard(title: stageWorkspaceTitle) {
-                        detailStageWorkspace(project: project, detail: detail)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
+                    ProjectCurrentAgentSection(
+                        snapshot: viewModel.state.selectedWorkflowSnapshot,
+                        detail: detail,
+                        projectName: project.title
+                    )
                 }
             } else {
                 DashboardCard(title: "阶段详情") {
@@ -54,59 +34,41 @@ struct ProjectDetailPage: View {
             }
         }
     }
+}
 
-    private var stageWorkspaceTitle: String {
-        let stage = viewModel.state.activeDetailStage
-        let detail = viewModel.state.selectedExecutionDetail
-        let subSteps = detail?.subSteps ?? []
-        let subStep = resolvedActiveSubStep(detail: detail, subSteps: subSteps)
-        if let subStep,
-           let match = subSteps.first(where: { $0.key == subStep }) {
-            return "\(stage.rawValue) · \(match.label)"
+private struct ProjectWorkflowActionBar: View {
+    @ObservedObject var viewModel: ShellViewModel
+    let snapshot: DeliveryWorkflowSnapshot?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            Button {
+                viewModel.runSelectedWorkflowStep()
+            } label: {
+                Label(runTitle, systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button {
+                viewModel.skipSelectedWorkflowStep()
+            } label: {
+                Label("跳过", systemImage: "forward.end.fill")
+            }
+            .buttonStyle(.bordered)
         }
-        return stage.rawValue
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    func resolvedActiveSubStep(
-        detail: DeliveryExecutionDetail?,
-        subSteps: [DeliverySubStepItem]
-    ) -> String? {
-        let stage = viewModel.state.activeDetailStage
-        let selected = viewModel.state.selectedSubStep
-
-        guard stage == .ui else {
-            return selected ?? detail?.activeSubStep ?? subSteps.first?.key
+    private var runTitle: String {
+        switch snapshot?.status ?? .notStarted {
+        case .failed, .blocked, .awaitingUserInput:
+            return "重试"
+        case .notStarted, .pending:
+            return "开始执行"
+        case .running, .completed:
+            return "重新执行"
         }
-
-        let pageMapDone = subSteps.first(where: { $0.key == "page_map" })?.hasContent == true
-        let interactionDone = subSteps.first(where: { $0.key == "interaction" })?.hasContent == true
-
-        if !pageMapDone {
-            return "page_map"
-        }
-
-        if !interactionDone {
-            return "interaction"
-        }
-
-        if let selected,
-           let selectedStep = subSteps.first(where: { $0.key == selected }),
-           !isSubStepDisabled(selectedStep, detail: detail) {
-            return selected
-        }
-
-        return detail?.activeSubStep ?? "interaction"
-    }
-
-    func isSubStepDisabled(_ step: DeliverySubStepItem, detail: DeliveryExecutionDetail?) -> Bool {
-        guard viewModel.state.activeDetailStage == .ui else {
-            return false
-        }
-        guard step.key == "interaction" else {
-            return false
-        }
-        let pageMapDone = detail?.subSteps.first(where: { $0.key == "page_map" })?.hasContent == true
-        return !pageMapDone
     }
 }
 
