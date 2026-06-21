@@ -14,7 +14,13 @@ from .models import (
     WorkflowResumeContext,
     WorkflowStartContext,
 )
-from .workflow import get_workflow_artifact, get_workflow_status, resume_workflow, start_workflow
+from .workflow import (
+    get_workflow_artifact,
+    get_workflow_events,
+    get_workflow_status,
+    resume_workflow,
+    start_workflow,
+)
 
 # ── Logging setup ──────────────────────────────────────────────────────────────
 # Explicitly set converter = time.localtime on the Formatter base class so that
@@ -75,6 +81,16 @@ async def workflow_status(ctx: WorkflowResumeContext):
     except Exception:
         logger.error("Workflow status failed: %s", traceback.format_exc())
         raise HTTPException(status_code=500, detail="Workflow 状态读取失败，请重试")
+
+
+@app.post("/workflow/events")
+async def workflow_events(ctx: WorkflowResumeContext):
+    """Return detailed checkpointed workflow events without advancing it."""
+    try:
+        return await get_workflow_events(ctx.workflow_id)
+    except Exception:
+        logger.error("Workflow events failed: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Workflow 过程读取失败，请重试")
 
 
 @app.post("/workflow/artifact")

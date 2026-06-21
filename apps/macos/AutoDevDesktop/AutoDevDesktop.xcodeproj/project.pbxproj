@@ -242,7 +242,10 @@
             "OBJ_349",
             "OBJ_350",
             "OBJ_355",
-            "OBJ_357"
+            "OBJ_357",
+            "OBJ_359",
+            "OBJ_361",
+            "OBJ_363"
          );
       };
       "OBJ_106" = {
@@ -573,7 +576,8 @@
             "OBJ_20",
             "OBJ_21",
             "OBJ_22",
-            "OBJ_23"
+            "OBJ_23",
+            "OBJ_358"
          );
          name = "Daemon";
          path = "Daemon";
@@ -857,7 +861,8 @@
             "OBJ_281",
             "OBJ_282",
             "OBJ_283",
-            "OBJ_284"
+            "OBJ_284",
+            "OBJ_362"
          );
          name = "Sections";
          path = "Sections";
@@ -1385,7 +1390,8 @@
          isa = "PBXGroup";
          children = (
             "OBJ_332",
-            "OBJ_341"
+            "OBJ_341",
+            "OBJ_360"
          );
          name = "DomainMapping";
          path = "DomainMapping";
@@ -1686,6 +1692,33 @@
       "OBJ_357" = {
          isa = "PBXBuildFile";
          fileRef = "OBJ_356";
+      };
+      "OBJ_358" = {
+         isa = "PBXFileReference";
+         path = "DaemonWorkflowDTO.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_359" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_358";
+      };
+      "OBJ_360" = {
+         isa = "PBXFileReference";
+         path = "DomainMapperWorkflow.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_361" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_360";
+      };
+      "OBJ_362" = {
+         isa = "PBXFileReference";
+         path = "ProjectWorkflowOverviewSection.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_363" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_362";
       };
       "OBJ_59" = {
          isa = "PBXFileReference";

@@ -57,6 +57,59 @@ struct DeliveryStageAIRun: Equatable {
     }
 }
 
+enum DeliveryWorkflowNodeStatus: String, Equatable {
+    case notStarted = "not_started"
+    case pending
+    case running
+    case completed
+    case failed
+    case blocked
+    case awaitingUserInput = "awaiting_user_input"
+}
+
+struct DeliveryWorkflowPhase: Identifiable, Equatable {
+    let id: String
+    var stage: String
+    var title: String
+    var kind: String
+    var status: DeliveryWorkflowNodeStatus
+    var artifactID: String?
+}
+
+struct DeliveryWorkflowEventItem: Identifiable, Equatable {
+    let id: String
+    var sequence: Int
+    var type: String
+    var stage: String
+    var title: String
+    var detail: String
+    var status: DeliveryWorkflowNodeStatus
+    var artifactID: String?
+}
+
+struct DeliveryWorkflowSnapshot: Equatable {
+    var workflowID: String
+    var threadID: String
+    var projectID: String
+    var projectName: String
+    var currentPhase: String
+    var currentStep: String
+    var status: DeliveryWorkflowNodeStatus
+    var awaitingUserInput: Bool
+    var error: String?
+    var phases: [DeliveryWorkflowPhase]
+    var artifacts: [DeliveryWorkflowPhase]
+    var events: [DeliveryWorkflowEventItem]
+
+    var isActive: Bool {
+        status == .running
+    }
+
+    var needsAction: Bool {
+        status == .failed || status == .blocked || status == .awaitingUserInput
+    }
+}
+
 struct DeliverySubTaskItem: Identifiable, Equatable {
     let id: String
     var title: String

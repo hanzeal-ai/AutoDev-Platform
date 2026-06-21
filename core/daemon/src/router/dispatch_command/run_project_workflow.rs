@@ -7,6 +7,40 @@ pub(super) fn handle_run(
     inbound: &protocol::EnvelopeIn,
     runtime_paths: &runtime::RuntimePaths,
 ) -> Result<(&'static str, Value), String> {
+    handle_workflow_command(
+        inbound,
+        runtime_paths,
+        protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW_OK,
+    )
+}
+
+pub(super) fn handle_start(
+    inbound: &protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+) -> Result<(&'static str, Value), String> {
+    handle_workflow_command(
+        inbound,
+        runtime_paths,
+        protocol::MESSAGE_COMMAND_START_PROJECT_WORKFLOW_OK,
+    )
+}
+
+pub(super) fn handle_resume(
+    inbound: &protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+) -> Result<(&'static str, Value), String> {
+    handle_workflow_command(
+        inbound,
+        runtime_paths,
+        protocol::MESSAGE_COMMAND_RESUME_PROJECT_WORKFLOW_OK,
+    )
+}
+
+fn handle_workflow_command(
+    inbound: &protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+    response_type: &'static str,
+) -> Result<(&'static str, Value), String> {
     let project_id = inbound.payload_string("project_id")?.trim().to_lowercase();
     let feedback = inbound.payload_object().ok().and_then(|payload| {
         payload
@@ -16,8 +50,5 @@ pub(super) fn handle_run(
             .map(str::to_string)
     });
     let store = store::Store::open(runtime_paths)?;
-    Ok((
-        protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW_OK,
-        store.run_project_workflow(&project_id, feedback.as_deref())?,
-    ))
+    Ok((response_type, store.run_project_workflow(&project_id, feedback.as_deref())?))
 }

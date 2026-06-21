@@ -123,6 +123,27 @@ WORKFLOW_ARTIFACTS: dict[str, dict[str, str]] = {
     },
 }
 
+WORKFLOW_ORDER = tuple(WORKFLOW_ARTIFACTS.keys())
+WORKFLOW_PREVIOUS_NODE: dict[str, NodeName] = {
+    "report": "chat",
+    "prd": "report",
+    "prd_review": "prd",
+    "development": "prd_review",
+    "coding": "development",
+    "code_review": "coding",
+    "summary": "code_review",
+}
+WORKFLOW_NODE_COMPLETE_PHASE: dict[NodeName, str] = {
+    "chat": "chat_complete",
+    "report": "report_complete",
+    "prd": "prd_complete",
+    "prd_review": "prd_review_complete",
+    "development": "development_complete",
+    "coding": "coding_complete",
+    "code_review": "code_review_complete",
+    "summary": "workflow_complete",
+}
+
 
 _prd_graph = build_prd_graph()
 _development_graph = build_development_graph()
@@ -149,11 +170,32 @@ async def start_workflow(ctx: WorkflowStartContext) -> dict[str, Any]:
 
 
 async def resume_workflow(workflow_id: str) -> dict[str, Any]:
+    state = await _get_checkpoint_state(workflow_id)
+    if _can_continue_from_awaiting_chat(state):
+        next_state = dict(state)
+        next_state["awaiting_user_input"] = False
+        next_state["current_phase"] = "chat_complete"
+        return await _resume_persistent_workflow_after_node(next_state, workflow_id, "chat")
+    retry = _retry_from_failed_phase(state)
+    if retry:
+        retry_state, retry_after = retry
+        return await _resume_persistent_workflow_after_node(
+            retry_state,
+            workflow_id,
+            retry_after,
+        )
+    resume_after = _resume_node_from_completed_phase(state)
+    if resume_after:
+        return await _resume_persistent_workflow_after_node(state, workflow_id, resume_after)
     return await _invoke_persistent_workflow(None, workflow_id)
 
 
 async def get_workflow_status(workflow_id: str) -> dict[str, Any]:
     return build_workflow_status(await _get_checkpoint_state(workflow_id))
+
+
+async def get_workflow_events(workflow_id: str) -> dict[str, Any]:
+    return build_workflow_events(await _get_checkpoint_state(workflow_id))
 
 
 async def get_workflow_artifact(workflow_id: str, artifact_id: str) -> dict[str, Any] | None:
@@ -173,7 +215,7 @@ def build_workflow_status(state: Mapping[str, Any]) -> dict[str, Any]:
     """Return workflow progress metadata without embedding large artifact payloads."""
     workflow_id = str(state.get("workflow_id") or state.get("project_id") or "").strip()
     current_phase = str(state.get("current_phase") or "").strip()
-    current_step = _step_from_phase(current_phase)
+    current_step = _active_step_from_state(state)
     error = state.get("error")
     awaiting_user_input = bool(state.get("awaiting_user_input"))
     status = _workflow_status(current_phase, error, awaiting_user_input)
@@ -204,6 +246,60 @@ def build_workflow_status(state: Mapping[str, Any]) -> dict[str, Any]:
         "error": error,
         "phases": phases,
         "artifacts": artifacts,
+    }
+
+
+def build_workflow_events(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Return detailed workflow progress events without artifact payloads."""
+    status = build_workflow_status(state)
+    workflow_id = str(status.get("workflow_id") or "").strip()
+    events: list[dict[str, Any]] = []
+
+    for sequence, (stage, phase) in enumerate(status["phases"].items(), start=1):
+        phase_status = str(phase.get("status") or "pending")
+        events.append(
+            {
+                "id": f"{workflow_id}:{stage}:phase" if workflow_id else f"{stage}:phase",
+                "sequence": sequence,
+                "type": "phase",
+                "stage": stage,
+                "title": phase["name"],
+                "detail": _phase_event_detail(stage, phase_status, state),
+                "status": phase_status,
+                "artifact_id": phase.get("artifact_id"),
+            }
+        )
+
+    sequence = len(events) + 1
+    for index, raw_event in enumerate(state.get("events") or [], start=0):
+        detail = str(raw_event).strip()
+        if not detail:
+            continue
+        events.append(
+            {
+                "id": f"{workflow_id}:log:{index}" if workflow_id else f"log:{index}",
+                "sequence": sequence,
+                "type": "log",
+                "stage": _event_stage(detail, str(status["current_step"])),
+                "title": "过程事件",
+                "detail": detail[:2048],
+                "status": "completed",
+                "artifact_id": None,
+            }
+        )
+        sequence += 1
+
+    return {
+        "workflow_id": workflow_id,
+        "thread_id": status["thread_id"],
+        "project_id": status["project_id"],
+        "project_name": status["project_name"],
+        "current_phase": status["current_phase"],
+        "current_step": status["current_step"],
+        "status": status["status"],
+        "awaiting_user_input": status["awaiting_user_input"],
+        "error": status["error"],
+        "events": events,
     }
 
 
@@ -245,6 +341,21 @@ async def _invoke_persistent_workflow(
     return build_workflow_status(dict(result or {}))
 
 
+async def _resume_persistent_workflow_after_node(
+    state: AutoDevWorkflowState,
+    workflow_id: str,
+    node: NodeName,
+) -> dict[str, Any]:
+    checkpoint_path = get_workflow_checkpoint_path()
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
+        graph = build_workflow_graph(checkpointer=checkpointer)
+        config = workflow_config(workflow_id)
+        await graph.aupdate_state(config, dict(state), as_node=node)
+        result = await graph.ainvoke(None, config=config)
+    return build_workflow_status(dict(result or {}))
+
+
 def build_workflow_graph(
     *,
     checkpointer: BaseCheckpointSaver | None = None,
@@ -275,7 +386,7 @@ def build_workflow_graph(
             "report": "report",
         },
     )
-    graph.add_edge("report", "prd")
+    graph.add_conditional_edges("report", _route_after_phase, {"stop": END, "continue": "prd"})
     graph.add_conditional_edges("prd", _route_after_phase, {"stop": END, "continue": "prd_review"})
     graph.add_conditional_edges(
         "prd_review",
@@ -310,223 +421,264 @@ def build_workflow_graph(
 
 
 async def chat_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    ctx = ChatContext(
-        thread_id=_required(state, "thread_id"),
-        user_message=_required(state, "user_message"),
-        draft=state.get("draft", {}),
-        messages=state.get("messages", []),
-        materials=state.get("materials", []),
-    )
-    result = await generate_chat(ctx, ModelConfig.from_env())
-    dumped = result.model_dump()
-    patch = dumped.get("report_patch") or {}
-    draft = _merge_report_patch(state.get("draft", {}), patch)
-    project_name = _project_name(state, draft)
-    return {
-        "chat_result": dumped,
-        "draft": draft,
-        "project_name": project_name,
-        "awaiting_user_input": not bool(patch),
-        "current_phase": "awaiting_user_input" if not patch else "chat_complete",
-        "error": None,
-    }
+    async def run() -> dict[str, Any]:
+        ctx = ChatContext(
+            thread_id=_required(state, "thread_id"),
+            user_message=_required(state, "user_message"),
+            draft=state.get("draft", {}),
+            messages=state.get("messages", []),
+            materials=state.get("materials", []),
+        )
+        result = await generate_chat(ctx, ModelConfig.from_env())
+        dumped = result.model_dump()
+        patch = dumped.get("report_patch") or {}
+        draft = _merge_report_patch(state.get("draft", {}), patch)
+        project_name = _project_name(state, draft)
+        awaiting_user_input = not bool(patch) and not _draft_ready_for_report(draft)
+        return {
+            "chat_result": dumped,
+            "draft": draft,
+            "project_name": project_name,
+            "awaiting_user_input": awaiting_user_input,
+            "current_phase": "awaiting_user_input" if awaiting_user_input else "chat_complete",
+            "error": None,
+            "events": _append_event(
+                state,
+                "chat: 需要用户补充需求信息" if awaiting_user_input else "chat: 需求澄清完成",
+            ),
+        }
+
+    return await _with_node_errors(state, "chat", run)
 
 
 async def report_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    ctx = ReportContext(
-        thread_id=_required(state, "thread_id"),
-        draft=state.get("draft", {}),
-        messages=state.get("messages", []),
-        materials=state.get("materials", []),
-    )
-    result = await generate_report(ctx, ModelConfig.from_env())
-    dumped = result.model_dump()
-    return {
-        "feasibility_report": dumped,
-        "project_name": _project_name(state, dumped),
-        "current_phase": "report_complete",
-        "error": None,
-    }
+    async def run() -> dict[str, Any]:
+        ctx = ReportContext(
+            thread_id=_required(state, "thread_id"),
+            draft=state.get("draft", {}),
+            messages=state.get("messages", []),
+            materials=state.get("materials", []),
+        )
+        result = await generate_report(ctx, ModelConfig.from_env())
+        dumped = result.model_dump()
+        return {
+            "feasibility_report": dumped,
+            "project_name": _project_name(state, dumped),
+            "current_phase": "report_complete",
+            "error": None,
+            "events": _append_event(state, "report: 可行性分析报告已生成"),
+        }
+
+    return await _with_node_errors(state, "report", run)
 
 
 async def prd_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    cfg = ModelConfig.from_env()
-    feasibility = dict(state.get("feasibility_report") or {})
-    if _needs_revision(state.get("prd_review_result")):
-        feasibility["prd_review_feedback"] = _review_feedback(state.get("prd_review_result", {}))
-    ctx = PRDContext(
-        project_id=_required(state, "project_id"),
-        project_name=_project_name(state, state.get("feasibility_report", {})),
-        feasibility=feasibility,
-    )
-    worker_state: PRDState = {
-        "context": ctx,
-        "config": cfg,
-        "agent_reply": "",
-        "deltas": [],
-        "structured": {},
-        "error": None,
-    }
-    return _phase_result(
-        await _prd_graph.ainvoke(worker_state),
-        "prd_result",
-        "prd_complete",
-    )
+    async def run() -> dict[str, Any]:
+        cfg = ModelConfig.from_env()
+        feasibility = dict(state.get("feasibility_report") or {})
+        if _needs_revision(state.get("prd_review_result")):
+            feasibility["prd_review_feedback"] = _review_feedback(state.get("prd_review_result", {}))
+        ctx = PRDContext(
+            project_id=_required(state, "project_id"),
+            project_name=_project_name(state, state.get("feasibility_report", {})),
+            feasibility=feasibility,
+        )
+        worker_state: PRDState = {
+            "context": ctx,
+            "config": cfg,
+            "agent_reply": "",
+            "deltas": [],
+            "structured": {},
+            "error": None,
+        }
+        result = _phase_result(
+            await _prd_graph.ainvoke(worker_state),
+            "prd_result",
+            "prd_complete",
+        )
+        result["events"] = _append_event(state, "prd: 产品需求文档已生成")
+        return result
+
+    return await _with_node_errors(state, "prd", run)
 
 
 async def prd_review_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    iteration = int(state.get("prd_review_iteration", 0)) + 1
-    max_iterations = int(state.get("max_prd_review_iterations", DEFAULT_MAX_PRD_REVIEW_ITERATIONS))
-    project_name = _project_name(state, state.get("prd_result", {}))
-    ctx = PRDContext(
-        project_id=_required(state, "project_id"),
-        project_name=project_name,
-        feasibility=state.get("feasibility_report"),
-    )
-    llm = create_llm(ModelConfig.from_env(), max_tokens=1600, json_mode=True)
-    response = await retry_async(
-        lambda: llm.ainvoke(
-            [
-                SystemMessage(content=PRD_REVIEW_SYSTEM),
-                HumanMessage(
-                    content=prd_review_user_prompt(
-                        project_name,
-                        json.dumps(state.get("feasibility_report", {}), ensure_ascii=False),
-                        json.dumps(state.get("prd_result", {}), ensure_ascii=False),
-                    )
-                ),
-            ],
-            config=build_trace_config(
-                "prd_review",
-                "prd_review",
-                ctx,
-                prompt_keys=["prd_review.system", "prd_review.user"],
-            ),
+    async def run() -> dict[str, Any]:
+        iteration = int(state.get("prd_review_iteration", 0)) + 1
+        max_iterations = int(state.get("max_prd_review_iterations", DEFAULT_MAX_PRD_REVIEW_ITERATIONS))
+        project_name = _project_name(state, state.get("prd_result", {}))
+        ctx = PRDContext(
+            project_id=_required(state, "project_id"),
+            project_name=project_name,
+            feasibility=state.get("feasibility_report"),
         )
-    )
-    review = _parse_review_response(response.content, default_summary="PRD 评审完成")
-    phase = _review_phase(
-        review,
-        iteration=iteration,
-        max_iterations=max_iterations,
-        passed_phase="prd_review_complete",
-        revision_phase="prd_review_revision_required",
-        blocked_phase="prd_review_blocked",
-    )
-    return {
-        "prd_review_iteration": iteration,
-        "max_prd_review_iterations": max_iterations,
-        "prd_review_result": review,
-        "awaiting_user_input": bool(review.get("requires_user_input")),
-        "current_phase": phase,
-        "error": None,
-    }
+        llm = create_llm(ModelConfig.from_env(), max_tokens=1600, json_mode=True)
+        response = await retry_async(
+            lambda: llm.ainvoke(
+                [
+                    SystemMessage(content=PRD_REVIEW_SYSTEM),
+                    HumanMessage(
+                        content=prd_review_user_prompt(
+                            project_name,
+                            json.dumps(state.get("feasibility_report", {}), ensure_ascii=False),
+                            json.dumps(state.get("prd_result", {}), ensure_ascii=False),
+                        )
+                    ),
+                ],
+                config=build_trace_config(
+                    "prd_review",
+                    "prd_review",
+                    ctx,
+                    prompt_keys=["prd_review.system", "prd_review.user"],
+                ),
+            )
+        )
+        review = _parse_review_response(response.content, default_summary="PRD 评审完成")
+        phase = _review_phase(
+            review,
+            iteration=iteration,
+            max_iterations=max_iterations,
+            passed_phase="prd_review_complete",
+            revision_phase="prd_review_revision_required",
+            blocked_phase="prd_review_blocked",
+        )
+        return {
+            "prd_review_iteration": iteration,
+            "max_prd_review_iterations": max_iterations,
+            "prd_review_result": review,
+            "awaiting_user_input": bool(review.get("requires_user_input")),
+            "current_phase": phase,
+            "error": None,
+            "events": _append_event(
+                state,
+                f"prd_review: 第 {iteration} 轮需求评审{_review_event_suffix(review, phase)}",
+            ),
+        }
+
+    return await _with_node_errors(state, "prd_review", run)
 
 
 async def development_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    cfg = ModelConfig.from_env()
-    ctx = DevelopmentContext(
-        project_id=_required(state, "project_id"),
-        project_name=_project_name(state, state.get("feasibility_report", {})),
-        prd=state.get("prd_result"),
-        feasibility=state.get("feasibility_report"),
-    )
-    worker_state: DevState = {
-        "context": ctx,
-        "config": cfg,
-        "architect_reply": "",
-        "deltas": [],
-        "structured": {},
-        "error": None,
-    }
-    return _phase_result(
-        await _development_graph.ainvoke(worker_state),
-        "development_plan",
-        "development_complete",
-    )
+    async def run() -> dict[str, Any]:
+        cfg = ModelConfig.from_env()
+        ctx = DevelopmentContext(
+            project_id=_required(state, "project_id"),
+            project_name=_project_name(state, state.get("feasibility_report", {})),
+            prd=state.get("prd_result"),
+            feasibility=state.get("feasibility_report"),
+        )
+        worker_state: DevState = {
+            "context": ctx,
+            "config": cfg,
+            "architect_reply": "",
+            "deltas": [],
+            "structured": {},
+            "error": None,
+        }
+        result = _phase_result(
+            await _development_graph.ainvoke(worker_state),
+            "development_plan",
+            "development_complete",
+        )
+        result["events"] = _append_event(state, "development: 研发计划已生成")
+        return result
+
+    return await _with_node_errors(state, "development", run)
 
 
 async def coding_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    cfg = ModelConfig.from_env()
-    task_breakdown = dict(state.get("development_plan") or {})
-    if _needs_revision(state.get("code_review_result")):
-        task_breakdown["code_review_feedback"] = _review_feedback(
-            state.get("code_review_result", {})
+    async def run() -> dict[str, Any]:
+        cfg = ModelConfig.from_env()
+        task_breakdown = dict(state.get("development_plan") or {})
+        if _needs_revision(state.get("code_review_result")):
+            task_breakdown["code_review_feedback"] = _review_feedback(
+                state.get("code_review_result", {})
+            )
+            task_breakdown["previous_coding_summary"] = str(
+                (state.get("coding_result") or {}).get("summary", "")
+            )[:1000]
+        ctx = CodingContext(
+            project_id=_required(state, "project_id"),
+            project_name=_project_name(state, state.get("feasibility_report", {})),
+            task_breakdown=task_breakdown,
         )
-        task_breakdown["previous_coding_summary"] = str(
-            (state.get("coding_result") or {}).get("summary", "")
-        )[:1000]
-    ctx = CodingContext(
-        project_id=_required(state, "project_id"),
-        project_name=_project_name(state, state.get("feasibility_report", {})),
-        task_breakdown=task_breakdown,
-    )
-    worker_state: CodingState = {
-        "context": ctx,
-        "config": cfg,
-        "coding_plan": [],
-        "coding_reply": "",
-        "deltas": [],
-        "structured": {},
-        "error": None,
-    }
-    return _phase_result(
-        await _coding_graph.ainvoke(worker_state),
-        "coding_result",
-        "coding_complete",
-    )
+        worker_state: CodingState = {
+            "context": ctx,
+            "config": cfg,
+            "coding_plan": [],
+            "coding_reply": "",
+            "deltas": [],
+            "structured": {},
+            "error": None,
+        }
+        result = _phase_result(
+            await _coding_graph.ainvoke(worker_state),
+            "coding_result",
+            "coding_complete",
+        )
+        result["events"] = _append_event(state, "coding: 代码生成阶段已完成")
+        return result
+
+    return await _with_node_errors(state, "coding", run)
 
 
 async def code_review_node(state: AutoDevWorkflowState) -> dict[str, Any]:
-    iteration = int(state.get("code_review_iteration", 0)) + 1
-    max_iterations = int(
-        state.get("max_code_review_iterations", DEFAULT_MAX_CODE_REVIEW_ITERATIONS)
-    )
-    project_name = _project_name(state, state.get("prd_result", {}))
-    ctx = CodingContext(
-        project_id=_required(state, "project_id"),
-        project_name=project_name,
-        task_breakdown=state.get("development_plan", {}),
-    )
-    llm = create_llm(ModelConfig.from_env(), max_tokens=1800, json_mode=True)
-    response = await retry_async(
-        lambda: llm.ainvoke(
-            [
-                SystemMessage(content=CODE_REVIEW_SYSTEM),
-                HumanMessage(
-                    content=code_review_user_prompt(
-                        project_name,
-                        json.dumps(state.get("prd_result", {}), ensure_ascii=False),
-                        json.dumps(state.get("development_plan", {}), ensure_ascii=False),
-                        json.dumps(state.get("coding_result", {}), ensure_ascii=False),
-                    )
-                ),
-            ],
-            config=build_trace_config(
-                "code_review",
-                "code_review",
-                ctx,
-                prompt_keys=["code_review.system", "code_review.user"],
-            ),
+    async def run() -> dict[str, Any]:
+        iteration = int(state.get("code_review_iteration", 0)) + 1
+        max_iterations = int(
+            state.get("max_code_review_iterations", DEFAULT_MAX_CODE_REVIEW_ITERATIONS)
         )
-    )
-    review = _parse_review_response(response.content, default_summary="代码评审完成")
-    phase = _review_phase(
-        review,
-        iteration=iteration,
-        max_iterations=max_iterations,
-        passed_phase="code_review_complete",
-        revision_phase="code_review_revision_required",
-        blocked_phase="code_review_blocked",
-    )
-    return {
-        "code_review_iteration": iteration,
-        "max_code_review_iterations": max_iterations,
-        "code_review_result": review,
-        "awaiting_user_input": bool(review.get("requires_user_input")),
-        "current_phase": phase,
-        "error": None,
-    }
+        project_name = _project_name(state, state.get("prd_result", {}))
+        ctx = CodingContext(
+            project_id=_required(state, "project_id"),
+            project_name=project_name,
+            task_breakdown=state.get("development_plan", {}),
+        )
+        llm = create_llm(ModelConfig.from_env(), max_tokens=1800, json_mode=True)
+        response = await retry_async(
+            lambda: llm.ainvoke(
+                [
+                    SystemMessage(content=CODE_REVIEW_SYSTEM),
+                    HumanMessage(
+                        content=code_review_user_prompt(
+                            project_name,
+                            json.dumps(state.get("prd_result", {}), ensure_ascii=False),
+                            json.dumps(state.get("development_plan", {}), ensure_ascii=False),
+                            json.dumps(state.get("coding_result", {}), ensure_ascii=False),
+                        )
+                    ),
+                ],
+                config=build_trace_config(
+                    "code_review",
+                    "code_review",
+                    ctx,
+                    prompt_keys=["code_review.system", "code_review.user"],
+                ),
+            )
+        )
+        review = _parse_review_response(response.content, default_summary="代码评审完成")
+        phase = _review_phase(
+            review,
+            iteration=iteration,
+            max_iterations=max_iterations,
+            passed_phase="code_review_complete",
+            revision_phase="code_review_revision_required",
+            blocked_phase="code_review_blocked",
+        )
+        return {
+            "code_review_iteration": iteration,
+            "max_code_review_iterations": max_iterations,
+            "code_review_result": review,
+            "awaiting_user_input": bool(review.get("requires_user_input")),
+            "current_phase": phase,
+            "error": None,
+            "events": _append_event(
+                state,
+                f"code_review: 第 {iteration} 轮代码评审{_review_event_suffix(review, phase)}",
+            ),
+        }
+
+    return await _with_node_errors(state, "code_review", run)
 
 
 async def summary_node(state: AutoDevWorkflowState) -> dict[str, Any]:
@@ -546,6 +698,7 @@ async def summary_node(state: AutoDevWorkflowState) -> dict[str, Any]:
         "current_phase": "workflow_complete",
         "awaiting_user_input": False,
         "error": None,
+        "events": _append_event(state, "summary: Workflow 完成总结已生成"),
     }
 
 
@@ -602,15 +755,58 @@ def _phase_result(worker_state: dict[str, Any], result_key: str, phase: str) -> 
     return {result_key: result, "current_phase": phase, "error": None}
 
 
+async def _with_node_errors(
+    state: AutoDevWorkflowState,
+    stage: str,
+    run: Callable[[], Awaitable[dict[str, Any]]],
+) -> dict[str, Any]:
+    try:
+        return await run()
+    except Exception as exc:
+        return _node_error(state, stage, exc)
+
+
+def _node_error(
+    state: Mapping[str, Any],
+    stage: str,
+    exc: Exception,
+) -> dict[str, Any]:
+    message = _exception_message(exc)
+    return {
+        "current_phase": f"{stage}_failed",
+        "awaiting_user_input": False,
+        "error": message,
+        "events": _append_event(state, f"{stage}: 执行失败：{message}"),
+    }
+
+
+def _exception_message(exc: Exception) -> str:
+    message = str(exc).strip()
+    normalized = message.lower()
+    if "insufficient balance" in normalized or "error code: 402" in normalized:
+        return "模型服务余额不足，请检查 API Key 对应账户余额或更换可用 Key。"
+    if "401" in normalized or "unauthorized" in normalized or "invalid api key" in normalized:
+        return "模型服务鉴权失败，请检查 .env 中的 API Key 是否正确。"
+    if "rate limit" in normalized or "too many requests" in normalized:
+        return "模型服务请求频率受限，请稍后重试或调整调用频率。"
+    if "timeout" in normalized or "timed out" in normalized:
+        return "模型服务请求超时，请稍后重试。"
+    return message[:2048] if message else exc.__class__.__name__
+
+
 def _phase_status(state: Mapping[str, Any], workflow_id: str, stage: str) -> dict[str, Any]:
     spec = WORKFLOW_ARTIFACTS[stage]
     has_artifact = bool(state.get(spec["state_key"]))
-    current_step = _step_from_phase(str(state.get("current_phase") or ""))
+    current_step = _active_step_from_state(state)
     status = "completed" if has_artifact else "pending"
     if current_step == stage and not has_artifact:
         status = "running"
     if current_step == stage and state.get("error"):
         status = "failed"
+    if current_step == stage and state.get("awaiting_user_input"):
+        status = "awaiting_user_input"
+    if current_step == stage and str(state.get("current_phase") or "").endswith("_blocked"):
+        status = "blocked"
     artifact_id = f"{workflow_id}:{stage}" if workflow_id and has_artifact else None
     return {
         "status": status,
@@ -618,6 +814,27 @@ def _phase_status(state: Mapping[str, Any], workflow_id: str, stage: str) -> dic
         "name": spec["name"],
         "kind": spec["kind"],
     }
+
+
+def _phase_event_detail(stage: str, status: str, state: Mapping[str, Any]) -> str:
+    if status == "completed":
+        return "阶段产物已生成"
+    if status == "running":
+        return "正在执行当前阶段"
+    if status == "awaiting_user_input":
+        return "等待用户补充信息"
+    if status == "failed":
+        return str(state.get("error") or "阶段执行失败")
+    if status == "blocked":
+        return "评审未通过或达到自动修复上限"
+    if stage == "chat":
+        return "等待启动需求澄清"
+    return "等待上游阶段完成"
+
+
+def _event_stage(detail: str, fallback: str) -> str:
+    prefix = detail.split(":", 1)[0].strip()
+    return prefix if prefix in WORKFLOW_ARTIFACTS else fallback
 
 
 def _workflow_status(
@@ -636,6 +853,83 @@ def _workflow_status(
     if not current_phase:
         return "not_started"
     return "running"
+
+
+def _active_step_from_state(state: Mapping[str, Any]) -> str:
+    current_phase = str(state.get("current_phase") or "").strip()
+    if not current_phase:
+        return "not_started"
+    if (
+        state.get("error")
+        or state.get("awaiting_user_input")
+        or current_phase == "workflow_complete"
+        or current_phase.endswith("_failed")
+        or current_phase.endswith("_blocked")
+    ):
+        return _step_from_phase(current_phase)
+
+    if current_phase == "prd_review_revision_required":
+        return "prd"
+    if current_phase == "code_review_revision_required":
+        return "coding"
+    phase_step = _step_from_phase(current_phase)
+    if current_phase.endswith("_complete") and phase_step in WORKFLOW_ORDER:
+        phase_index = WORKFLOW_ORDER.index(phase_step)
+        for stage in WORKFLOW_ORDER[phase_index + 1 :]:
+            spec = WORKFLOW_ARTIFACTS[stage]
+            artifact = state.get(spec["state_key"])
+            if not artifact:
+                return stage
+            if stage == "prd_review" and _needs_revision(artifact):
+                return "prd"
+            if stage == "code_review" and _needs_revision(artifact):
+                return "coding"
+        return "summary"
+
+    for stage in WORKFLOW_ORDER:
+        spec = WORKFLOW_ARTIFACTS[stage]
+        artifact = state.get(spec["state_key"])
+        if not artifact:
+            return stage
+        if stage == "prd_review" and _needs_revision(artifact):
+            return "prd"
+        if stage == "code_review" and _needs_revision(artifact):
+            return "coding"
+    return "summary"
+
+
+def _resume_node_from_completed_phase(state: Mapping[str, Any]) -> NodeName | None:
+    current_phase = str(state.get("current_phase") or "").strip()
+    if state.get("error") or state.get("awaiting_user_input"):
+        return None
+    if current_phase == "prd_review_revision_required":
+        return "prd_review"
+    if current_phase == "code_review_revision_required":
+        return "code_review"
+    if not current_phase.endswith("_complete") or current_phase == "workflow_complete":
+        return None
+    node = _step_from_phase(current_phase)
+    if node in WORKFLOW_ORDER:
+        return node  # type: ignore[return-value]
+    return None
+
+
+def _retry_from_failed_phase(
+    state: Mapping[str, Any],
+) -> tuple[AutoDevWorkflowState, NodeName] | None:
+    current_phase = str(state.get("current_phase") or "").strip()
+    if not current_phase.endswith("_failed"):
+        return None
+    failed_stage = current_phase.removesuffix("_failed")
+    previous_node = WORKFLOW_PREVIOUS_NODE.get(failed_stage)
+    if previous_node is None:
+        return None
+    retry_state: AutoDevWorkflowState = dict(state)
+    retry_state["error"] = None
+    retry_state["awaiting_user_input"] = False
+    retry_state["current_phase"] = WORKFLOW_NODE_COMPLETE_PHASE[previous_node]
+    retry_state["events"] = _append_event(retry_state, f"{failed_stage}: 重新执行")
+    return retry_state, previous_node
 
 
 def _step_from_phase(current_phase: str) -> str:
@@ -730,6 +1024,22 @@ def _needs_revision(review: dict[str, Any] | None) -> bool:
     return bool(review) and not bool((review or {}).get("approved"))
 
 
+def _append_event(state: Mapping[str, Any], detail: str) -> list[str]:
+    events = list(state.get("events") or [])
+    events.append(detail)
+    return events
+
+
+def _review_event_suffix(review: dict[str, Any], phase: str) -> str:
+    if review.get("approved"):
+        return "通过"
+    if review.get("requires_user_input"):
+        return "需要用户补充信息"
+    if phase.endswith("_blocked"):
+        return "阻塞"
+    return "需要修订"
+
+
 def _review_feedback(review: dict[str, Any]) -> dict[str, Any]:
     return {
         "summary": str(review.get("summary", ""))[:1000],
@@ -754,6 +1064,36 @@ def _merge_report_patch(draft: dict[str, Any], patch: dict[str, Any]) -> dict[st
         if value not in ("", None, []):
             merged[key] = value
     return merged
+
+
+def _can_continue_from_awaiting_chat(state: Mapping[str, Any]) -> bool:
+    current_phase = str(state.get("current_phase") or "")
+    current_step = _step_from_phase(current_phase)
+    if current_step != "chat" or current_phase != "awaiting_user_input":
+        return False
+    return _draft_ready_for_report(state.get("draft") or {})
+
+
+def _draft_ready_for_report(draft: Mapping[str, Any]) -> bool:
+    required_fields = (
+        "project_name",
+        "problem_definition",
+        "target_users",
+        "core_capabilities",
+    )
+    return all(_has_meaningful_value(draft.get(field)) for field in required_fields)
+
+
+def _has_meaningful_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return any(_has_meaningful_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(_has_meaningful_value(item) for item in value.values())
+    return True
 
 
 def _project_name(state: AutoDevWorkflowState, candidate: dict[str, Any]) -> str:

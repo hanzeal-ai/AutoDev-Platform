@@ -38,18 +38,6 @@ INSERT INTO feasibility_reports (
             )
             .map_err(|err| err.to_string())?;
 
-        self.conn
-            .execute(
-                "INSERT INTO creation_messages (id, thread_id, role, content, created_at_ms) VALUES (?1, ?2, 'ai', ?3, ?4)",
-                params![
-                    Uuid::new_v4().to_string(),
-                    thread_id,
-                    "新线程已建立。请先描述你想交付的系统目标。",
-                    now
-                ],
-            )
-            .map_err(|err| err.to_string())?;
-
         Ok(json!({ "thread_id": thread_id }))
     }
 }

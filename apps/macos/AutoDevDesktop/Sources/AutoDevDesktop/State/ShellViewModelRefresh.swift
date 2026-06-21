@@ -41,16 +41,31 @@ extension ShellViewModel {
             return
         }
         do {
-            let detail = try await daemonClient.getProjectStageDetail(
+            async let detailRequest = daemonClient.getProjectStageDetail(
                 projectID: requestKey.projectID.uuidString,
                 stage: DomainMapper.stageKey(requestKey.stage),
                 subStep: state.selectedSubStep
+            )
+            async let workflowStatusRequest = daemonClient.getProjectWorkflowStatus(
+                projectID: requestKey.projectID.uuidString
+            )
+            async let workflowEventsRequest = daemonClient.listProjectWorkflowEvents(
+                projectID: requestKey.projectID.uuidString
+            )
+            let (detail, workflowStatus, workflowEvents) = try await (
+                detailRequest,
+                workflowStatusRequest,
+                workflowEventsRequest
             )
             guard !Task.isCancelled, state.selectedExecutionDetailKey == requestKey else {
                 return
             }
             let mappedDetail = DomainMapper.mapStageDetail(detail)
             state.executionDetails[requestKey] = mappedDetail
+            state.workflowSnapshots[requestKey.projectID] = DomainMapper.mapWorkflowSnapshot(
+                status: workflowStatus,
+                events: workflowEvents
+            )
             scheduleStageAIDetailPollingIfNeeded(detail: mappedDetail, requestKey: requestKey)
         } catch is CancellationError {
             return
@@ -85,10 +100,19 @@ extension ShellViewModel {
             guard let self else { return }
             defer { isGeneratingStageAI = false }
             do {
-                _ = try await daemonClient.runProjectWorkflow(
-                    projectID: requestKey.projectID.uuidString,
-                    feedback: feedback
-                )
+                let shouldStart = state.workflowSnapshots[requestKey.projectID]?.status == .notStarted
+                    || state.workflowSnapshots[requestKey.projectID] == nil
+                if shouldStart {
+                    _ = try await daemonClient.startProjectWorkflow(
+                        projectID: requestKey.projectID.uuidString,
+                        feedback: feedback
+                    )
+                } else {
+                    _ = try await daemonClient.resumeProjectWorkflow(
+                        projectID: requestKey.projectID.uuidString,
+                        feedback: feedback
+                    )
+                }
                 guard state.selectedExecutionDetailKey == requestKey else { return }
                 state.statusMessage = "后台 AI 流式生成中..."
                 var pollDelay: UInt64 = 1_000_000_000  // Start at 1 second

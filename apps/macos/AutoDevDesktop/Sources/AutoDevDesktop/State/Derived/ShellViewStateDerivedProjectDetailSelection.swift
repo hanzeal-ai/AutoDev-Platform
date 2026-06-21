@@ -15,6 +15,13 @@ extension ShellViewState {
         return executionDetails[key]
     }
 
+    var selectedWorkflowSnapshot: DeliveryWorkflowSnapshot? {
+        guard let project = selectedProject else {
+            return nil
+        }
+        return workflowSnapshots[project.id]
+    }
+
     var activeDetailStage: DeliveryLifecycleStage {
         selectedDetailStage ?? selectedProject?.lifecycleStage ?? .development
     }

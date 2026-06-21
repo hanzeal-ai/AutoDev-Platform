@@ -7,8 +7,17 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from autodev_ai.workflow import (
     build_workflow_graph,
     build_workflow_status,
+    build_workflow_events,
     build_workflow_artifact,
+    chat_node,
+    report_node,
+    prd_node,
+    development_node,
+    coding_node,
+    prd_review_node,
+    code_review_node,
     get_workflow_checkpoint_path,
+    resume_workflow,
     _phase_result,
     workflow_config,
 )
@@ -154,6 +163,41 @@ async def test_workflow_graph_stops_after_phase_error():
 
     assert result["error"] == "prd failed"
     assert result["current_phase"] == "prd_failed"
+
+
+@pytest.mark.anyio
+async def test_workflow_graph_stops_after_report_error():
+    async def chat(state):
+        return {
+            "chat_result": {"assistant_reply": "ok", "report_patch": {"project_name": "Demo"}},
+            "draft": {"project_name": "Demo"},
+            "awaiting_user_input": False,
+            "current_phase": "chat_complete",
+        }
+
+    async def report(state):
+        return {"error": "report failed", "current_phase": "report_failed"}
+
+    async def should_not_run(state):
+        raise AssertionError("prd should not run after report error")
+
+    graph = build_workflow_graph(
+        node_overrides={
+            "chat": chat,
+            "report": report,
+            "prd": should_not_run,
+            "prd_review": should_not_run,
+            "development": should_not_run,
+            "coding": should_not_run,
+            "code_review": should_not_run,
+            "summary": should_not_run,
+        }
+    )
+
+    result = await graph.ainvoke({"workflow_id": "wf-report-error", "thread_id": "thread"})
+
+    assert result["error"] == "report failed"
+    assert result["current_phase"] == "report_failed"
 
 
 @pytest.mark.anyio
@@ -524,15 +568,201 @@ def test_workflow_status_exposes_phase_state_and_artifact_ids_without_payloads()
     assert status["workflow_id"] == "wf-1"
     assert status["project_id"] == "project-1"
     assert status["current_phase"] == "development_complete"
-    assert status["current_step"] == "development"
+    assert status["current_step"] == "coding"
     assert status["status"] == "running"
     assert status["phases"]["report"]["status"] == "completed"
     assert status["phases"]["report"]["artifact_id"] == "wf-1:report"
     assert status["phases"]["prd"]["artifact_id"] == "wf-1:prd"
     assert status["phases"]["development"]["artifact_id"] == "wf-1:development"
-    assert status["phases"]["coding"]["status"] == "pending"
+    assert status["phases"]["coding"]["status"] == "running"
     assert "feasibility_report" not in status
     assert "development_plan" not in status
+
+
+def test_workflow_events_exposes_node_progress_and_raw_logs_without_artifact_payloads():
+    state = {
+        "workflow_id": "wf-1",
+        "thread_id": "thread-1",
+        "project_id": "project-1",
+        "project_name": "Demo",
+        "current_phase": "coding_complete",
+        "events": ["report: 可行性分析报告已生成", "tool:file_search"],
+        "feasibility_report": {"summary": "可行"},
+        "prd_result": {"summary": "PRD"},
+        "development_plan": {"summary": "研发计划"},
+        "coding_result": {"summary": "代码完成"},
+    }
+
+    payload = build_workflow_events(state)
+
+    assert payload["workflow_id"] == "wf-1"
+    assert payload["current_step"] == "code_review"
+    assert payload["status"] == "running"
+    events = payload["events"]
+    assert [event["stage"] for event in events[:8]] == [
+        "chat",
+        "report",
+        "prd",
+        "prd_review",
+        "development",
+        "coding",
+        "code_review",
+        "summary",
+    ]
+    assert events[1]["status"] == "completed"
+    assert events[1]["artifact_id"] == "wf-1:report"
+    assert events[5]["status"] == "completed"
+    assert events[5]["artifact_id"] == "wf-1:coding"
+    assert events[6]["status"] == "running"
+    assert events[-2]["type"] == "log"
+    assert events[-2]["stage"] == "report"
+    assert events[-2]["detail"] == "report: 可行性分析报告已生成"
+    assert events[-1]["stage"] == "code_review"
+    assert "feasibility_report" not in payload
+    assert "coding_result" not in payload
+
+
+def test_workflow_status_advances_active_step_after_completed_checkpoint():
+    status = build_workflow_status(
+        {
+            "workflow_id": "wf-active",
+            "current_phase": "chat_complete",
+            "awaiting_user_input": False,
+            "chat_result": {"assistant_reply": "ok"},
+        }
+    )
+
+    assert status["current_step"] == "report"
+    assert status["phases"]["chat"]["status"] == "completed"
+    assert status["phases"]["report"]["status"] == "running"
+
+
+@pytest.mark.anyio
+async def test_report_node_converts_llm_error_to_failed_state(monkeypatch):
+    async def fake_generate_report(ctx, cfg):
+        raise RuntimeError("insufficient balance")
+
+    monkeypatch.setattr("autodev_ai.workflow.generate_report", fake_generate_report)
+
+    result = await report_node(
+        {
+            "thread_id": "thread-1",
+            "draft": {"project_name": "Demo"},
+            "messages": [],
+            "materials": [],
+            "events": ["chat: 需求澄清完成"],
+        }
+    )
+
+    assert result["current_phase"] == "report_failed"
+    assert result["error"] == "模型服务余额不足，请检查 API Key 对应账户余额或更换可用 Key。"
+    assert result["events"][-1] == (
+        "report: 执行失败：模型服务余额不足，请检查 API Key 对应账户余额或更换可用 Key。"
+    )
+
+
+@pytest.mark.anyio
+async def test_report_node_normalizes_insufficient_balance_error(monkeypatch):
+    raw_error = (
+        "Error code: 402 - {'error': {'message': 'Insufficient Balance', "
+        "'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}"
+    )
+
+    async def fake_generate_report(ctx, cfg):
+        raise RuntimeError(raw_error)
+
+    monkeypatch.setattr("autodev_ai.workflow.generate_report", fake_generate_report)
+
+    result = await report_node(
+        {
+            "thread_id": "thread-1",
+            "draft": {"project_name": "Demo"},
+            "messages": [],
+            "materials": [],
+            "events": [],
+        }
+    )
+
+    assert result["current_phase"] == "report_failed"
+    assert result["error"] == "模型服务余额不足，请检查 API Key 对应账户余额或更换可用 Key。"
+    assert result["events"][-1] == (
+        "report: 执行失败：模型服务余额不足，请检查 API Key 对应账户余额或更换可用 Key。"
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("node_name", "node", "graph_attr", "expected_phase"),
+    [
+        ("prd", prd_node, "_prd_graph", "prd_failed"),
+        ("development", development_node, "_development_graph", "development_failed"),
+        ("coding", coding_node, "_coding_graph", "coding_failed"),
+    ],
+)
+async def test_subgraph_nodes_convert_worker_errors_to_failed_state(
+    monkeypatch,
+    node_name,
+    node,
+    graph_attr,
+    expected_phase,
+):
+    class FailingGraph:
+        async def ainvoke(self, worker_state):
+            raise RuntimeError(f"{node_name} interrupted")
+
+    monkeypatch.setattr(f"autodev_ai.workflow.{graph_attr}", FailingGraph())
+
+    result = await node(
+        {
+            "project_id": "project-1",
+            "project_name": "Demo",
+            "feasibility_report": {"project_name": "Demo"},
+            "prd_result": {"summary": "PRD"},
+            "development_plan": {"summary": "Plan"},
+            "events": [],
+        }
+    )
+
+    assert result["current_phase"] == expected_phase
+    assert result["error"] == f"{node_name} interrupted"
+    assert result["events"][-1] == f"{node_name}: 执行失败：{node_name} interrupted"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("node_name", "node", "expected_phase"),
+    [
+        ("prd_review", prd_review_node, "prd_review_failed"),
+        ("code_review", code_review_node, "code_review_failed"),
+    ],
+)
+async def test_review_nodes_convert_llm_errors_to_failed_state(
+    monkeypatch,
+    node_name,
+    node,
+    expected_phase,
+):
+    class FailingLLM:
+        async def ainvoke(self, messages, config=None):
+            raise RuntimeError(f"{node_name} unavailable")
+
+    monkeypatch.setattr("autodev_ai.workflow.create_llm", lambda *args, **kwargs: FailingLLM())
+
+    result = await node(
+        {
+            "project_id": "project-1",
+            "project_name": "Demo",
+            "feasibility_report": {"project_name": "Demo"},
+            "prd_result": {"summary": "PRD"},
+            "development_plan": {"summary": "Plan"},
+            "coding_result": {"summary": "Code"},
+            "events": [],
+        }
+    )
+
+    assert result["current_phase"] == expected_phase
+    assert result["error"] == f"{node_name} unavailable"
+    assert result["events"][-1] == f"{node_name}: 执行失败：{node_name} unavailable"
 
 
 def test_workflow_artifact_returns_payload_by_id():
@@ -565,6 +795,209 @@ def test_workflow_artifact_rejects_unknown_or_unavailable_artifact():
 
     assert build_workflow_artifact(state, "wf-1:missing") is None
     assert build_workflow_artifact(state, "wf-2:report") is None
+
+
+@pytest.mark.anyio
+async def test_chat_node_continues_when_existing_draft_is_complete_and_patch_is_empty(monkeypatch):
+    class FakeChatResult:
+        def model_dump(self):
+            return {
+                "assistant_reply": "现有信息已足够，可以继续生成可行性报告。",
+                "report_patch": {},
+            }
+
+    async def fake_generate_chat(ctx, cfg):
+        return FakeChatResult()
+
+    monkeypatch.setattr("autodev_ai.workflow.generate_chat", fake_generate_chat)
+    state = {
+        "thread_id": "thread-1",
+        "user_message": "小红书自动热点推文系统",
+        "draft": {
+            "project_name": "小红书自动热点推文系统",
+            "problem_definition": "自动发现热点并生成推文",
+            "target_users": "运营人员",
+            "core_capabilities": ["热点抓取", "内容生成"],
+            "risks_and_constraints": ["平台风控"],
+            "initial_delivery_plan": "先做 MVP",
+        },
+        "messages": [],
+        "materials": [],
+    }
+
+    result = await chat_node(state)
+
+    assert result["awaiting_user_input"] is False
+    assert result["current_phase"] == "chat_complete"
+    assert result["events"] == ["chat: 需求澄清完成"]
+
+
+@pytest.mark.anyio
+async def test_resume_restarts_awaiting_chat_when_existing_draft_is_complete(monkeypatch):
+    captured = {}
+    state = {
+        "workflow_id": "wf-ready",
+        "thread_id": "thread-1",
+        "current_phase": "awaiting_user_input",
+        "awaiting_user_input": True,
+        "draft": {
+            "project_name": "Demo",
+            "problem_definition": "Build a tool",
+            "target_users": "Operators",
+            "core_capabilities": ["Generate"],
+        },
+        "chat_result": {"assistant_reply": "信息足够", "report_patch": {}},
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-ready")
+
+    assert result == {"workflow_id": "wf-ready", "status": "running"}
+    assert captured["workflow_id"] == "wf-ready"
+    assert captured["node"] == "chat"
+    assert captured["state"]["awaiting_user_input"] is False
+    assert captured["state"]["current_phase"] == "chat_complete"
+
+
+@pytest.mark.anyio
+async def test_resume_continues_after_completed_checkpoint(monkeypatch):
+    captured = {}
+    state = {
+        "workflow_id": "wf-chat-complete",
+        "thread_id": "thread-1",
+        "current_phase": "chat_complete",
+        "awaiting_user_input": False,
+        "chat_result": {"assistant_reply": "信息足够", "report_patch": {}},
+        "draft": {"project_name": "Demo"},
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-chat-complete")
+
+    assert result == {"workflow_id": "wf-chat-complete", "status": "running"}
+    assert captured["workflow_id"] == "wf-chat-complete"
+    assert captured["node"] == "chat"
+    assert captured["state"]["current_phase"] == "chat_complete"
+
+
+@pytest.mark.anyio
+async def test_resume_retries_failed_report_from_previous_checkpoint(monkeypatch):
+    captured = {}
+    state = {
+        "workflow_id": "wf-report-failed",
+        "thread_id": "thread-1",
+        "current_phase": "report_failed",
+        "awaiting_user_input": False,
+        "error": "模型服务余额不足",
+        "chat_result": {"assistant_reply": "信息足够", "report_patch": {}},
+        "draft": {"project_name": "Demo"},
+        "events": ["report: 执行失败：模型服务余额不足"],
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-report-failed")
+
+    assert result == {"workflow_id": "wf-report-failed", "status": "running"}
+    assert captured["workflow_id"] == "wf-report-failed"
+    assert captured["node"] == "chat"
+    assert captured["state"]["current_phase"] == "chat_complete"
+    assert captured["state"]["error"] is None
+    assert captured["state"]["events"][-1] == "report: 重新执行"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("failed_phase", "resume_node", "resume_phase", "retry_event"),
+    [
+        ("prd_failed", "report", "report_complete", "prd: 重新执行"),
+        ("prd_review_failed", "prd", "prd_complete", "prd_review: 重新执行"),
+        ("development_failed", "prd_review", "prd_review_complete", "development: 重新执行"),
+        ("coding_failed", "development", "development_complete", "coding: 重新执行"),
+        ("code_review_failed", "coding", "coding_complete", "code_review: 重新执行"),
+        ("summary_failed", "code_review", "code_review_complete", "summary: 重新执行"),
+    ],
+)
+async def test_resume_retries_failed_downstream_node(
+    monkeypatch,
+    failed_phase,
+    resume_node,
+    resume_phase,
+    retry_event,
+):
+    captured = {}
+    state = {
+        "workflow_id": "wf-node-failed",
+        "thread_id": "thread-1",
+        "current_phase": failed_phase,
+        "awaiting_user_input": False,
+        "error": "temporary failure",
+        "events": [f"{failed_phase}: 执行失败：temporary failure"],
+    }
+
+    async def fake_get_checkpoint_state(workflow_id):
+        return dict(state)
+
+    async def fake_resume_persistent_workflow_after_node(next_state, workflow_id, node):
+        captured["state"] = next_state
+        captured["workflow_id"] = workflow_id
+        captured["node"] = node
+        return {"workflow_id": workflow_id, "status": "running"}
+
+    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr(
+        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        fake_resume_persistent_workflow_after_node,
+    )
+
+    result = await resume_workflow("wf-node-failed")
+
+    assert result == {"workflow_id": "wf-node-failed", "status": "running"}
+    assert captured["node"] == resume_node
+    assert captured["state"]["current_phase"] == resume_phase
+    assert captured["state"]["error"] is None
+    assert captured["state"]["events"][-1] == retry_event
 
 
 def test_phase_result_raises_on_worker_error_for_checkpoint_resume():

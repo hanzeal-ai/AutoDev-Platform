@@ -18,29 +18,15 @@ struct ProjectDetailPage: View {
                         ProjectDetailDecisionFallbackSection(viewModel: viewModel)
                     }
 
-                    // Lifecycle track + sub-step track
-                    DashboardCard(title: "生命周期轨道") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ProjectDetailLifecycleTrack(
-                                current: project.lifecycleStage,
-                                viewing: viewModel.state.activeDetailStage,
-                                onSelectStage: { viewModel.selectDetailStage($0) }
-                            )
-                            if !subSteps.isEmpty {
-                                StageSubStepTrack(
-                                    subSteps: subSteps,
-                                    activeSubStep: activeSubStep,
-                                    onSelect: { viewModel.selectSubStep($0) },
-                                    isStepDisabled: { step in
-                                        isSubStepDisabled(step, detail: detail)
-                                    },
-                                    onDisabledSelect: { _ in
-                                        viewModel.showStatusMessage("请先完成页面地图")
-                                    }
-                                )
-                            }
+                    ProjectWorkflowOverviewSection(
+                        viewModel: viewModel,
+                        snapshot: viewModel.state.selectedWorkflowSnapshot,
+                        subSteps: subSteps,
+                        activeSubStep: activeSubStep,
+                        isSubStepDisabled: { step in
+                            isSubStepDisabled(step, detail: detail)
                         }
-                    }
+                    )
 
                     // AI execution progress (skip for feasibility chat)
                     if viewModel.state.activeDetailStage != .feasibility,

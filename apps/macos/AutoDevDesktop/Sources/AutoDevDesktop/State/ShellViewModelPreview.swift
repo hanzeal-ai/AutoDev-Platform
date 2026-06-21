@@ -33,6 +33,37 @@ private struct PreviewDaemonClient: DaemonQuerying {
         throw DaemonClientError.malformedResponse
     }
 
+    func getProjectWorkflowStatus(projectID: String) async throws -> DaemonProjectWorkflowStatus {
+        DaemonProjectWorkflowStatus(
+            workflowId: projectID,
+            threadId: projectID,
+            projectId: projectID,
+            projectName: "Preview",
+            currentPhase: "",
+            currentStep: "chat",
+            status: "not_started",
+            awaitingUserInput: false,
+            error: nil,
+            phases: [:],
+            artifacts: []
+        )
+    }
+
+    func listProjectWorkflowEvents(projectID: String) async throws -> DaemonProjectWorkflowEvents {
+        DaemonProjectWorkflowEvents(
+            workflowId: projectID,
+            threadId: projectID,
+            projectId: projectID,
+            projectName: "Preview",
+            currentPhase: "",
+            currentStep: "chat",
+            status: "not_started",
+            awaitingUserInput: false,
+            error: nil,
+            events: []
+        )
+    }
+
     func createCreationThread() async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
@@ -60,6 +91,14 @@ private struct PreviewDaemonClient: DaemonQuerying {
     func addCreationMaterials(threadID _: String, paths _: [String]) async throws {}
 
     func runProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
+        throw DaemonClientError.malformedResponse
+    }
+
+    func startProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
+        throw DaemonClientError.malformedResponse
+    }
+
+    func resumeProjectWorkflow(projectID _: String, feedback _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }
 

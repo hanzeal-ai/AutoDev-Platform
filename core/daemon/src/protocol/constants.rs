@@ -10,6 +10,12 @@ pub const MESSAGE_QUERY_LIST_CREATION_THREADS: &str = "query.list_creation_threa
 pub const MESSAGE_QUERY_LIST_CREATION_THREADS_OK: &str = "query.list_creation_threads.ok";
 pub const MESSAGE_QUERY_GET_PROJECT_STAGE_DETAIL: &str = "query.get_project_stage_detail";
 pub const MESSAGE_QUERY_GET_PROJECT_STAGE_DETAIL_OK: &str = "query.get_project_stage_detail.ok";
+pub const MESSAGE_QUERY_GET_PROJECT_WORKFLOW_STATUS: &str = "query.get_project_workflow_status";
+pub const MESSAGE_QUERY_GET_PROJECT_WORKFLOW_STATUS_OK: &str =
+    "query.get_project_workflow_status.ok";
+pub const MESSAGE_QUERY_LIST_PROJECT_WORKFLOW_EVENTS: &str = "query.list_project_workflow_events";
+pub const MESSAGE_QUERY_LIST_PROJECT_WORKFLOW_EVENTS_OK: &str =
+    "query.list_project_workflow_events.ok";
 
 pub const MESSAGE_COMMAND_CREATE_CREATION_THREAD: &str = "command.create_creation_thread";
 pub const MESSAGE_COMMAND_CREATE_CREATION_THREAD_OK: &str = "command.create_creation_thread.ok";
@@ -25,6 +31,10 @@ pub const MESSAGE_COMMAND_ADD_CREATION_MATERIALS: &str = "command.add_creation_m
 pub const MESSAGE_COMMAND_ADD_CREATION_MATERIALS_OK: &str = "command.add_creation_materials.ok";
 pub const MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW: &str = "command.run_project_workflow";
 pub const MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW_OK: &str = "command.run_project_workflow.ok";
+pub const MESSAGE_COMMAND_START_PROJECT_WORKFLOW: &str = "command.start_project_workflow";
+pub const MESSAGE_COMMAND_START_PROJECT_WORKFLOW_OK: &str = "command.start_project_workflow.ok";
+pub const MESSAGE_COMMAND_RESUME_PROJECT_WORKFLOW: &str = "command.resume_project_workflow";
+pub const MESSAGE_COMMAND_RESUME_PROJECT_WORKFLOW_OK: &str = "command.resume_project_workflow.ok";
 pub const MESSAGE_COMMAND_DELETE_PROJECT: &str = "command.delete_project";
 pub const MESSAGE_COMMAND_DELETE_PROJECT_OK: &str = "command.delete_project.ok";
 

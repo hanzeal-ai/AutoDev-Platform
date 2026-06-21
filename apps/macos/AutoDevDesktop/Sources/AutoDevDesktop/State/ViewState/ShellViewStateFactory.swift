@@ -60,6 +60,7 @@ extension ShellViewState {
             lifecycleDistribution: [],
             stageBlueprints: [:],
             executionDetails: [:],
+            workflowSnapshots: [:],
             opsSnapshot: defaultOpsSnapshot(),
             userProfile: defaultUserProfile(),
             daemonStatus: daemonStatus,

@@ -59,6 +59,32 @@ pub(super) fn dispatch(
                 ))
             }))
         }
+        protocol::MESSAGE_QUERY_GET_PROJECT_WORKFLOW_STATUS => {
+            let project_id = match inbound.payload_string("project_id") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let store = store::Store::open(runtime_paths);
+            Some(store.and_then(|store| {
+                Ok((
+                    protocol::MESSAGE_QUERY_GET_PROJECT_WORKFLOW_STATUS_OK,
+                    store.get_project_workflow_status(&project_id)?,
+                ))
+            }))
+        }
+        protocol::MESSAGE_QUERY_LIST_PROJECT_WORKFLOW_EVENTS => {
+            let project_id = match inbound.payload_string("project_id") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let store = store::Store::open(runtime_paths);
+            Some(store.and_then(|store| {
+                Ok((
+                    protocol::MESSAGE_QUERY_LIST_PROJECT_WORKFLOW_EVENTS_OK,
+                    store.list_project_workflow_events(&project_id)?,
+                ))
+            }))
+        }
         _ => None,
     }
 }

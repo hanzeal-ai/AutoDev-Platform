@@ -94,6 +94,80 @@ final class DomainMapperTests: XCTestCase {
         XCTAssertNil(item)
     }
 
+    func testMapWorkflowSnapshotKeepsCanonicalStageOrderAndEvents() {
+        let status = DaemonProjectWorkflowStatus(
+            workflowId: "wf-1",
+            threadId: "thread-1",
+            projectId: "project-1",
+            projectName: "Demo",
+            currentPhase: "coding_complete",
+            currentStep: "coding",
+            status: "running",
+            awaitingUserInput: false,
+            error: nil,
+            phases: [
+                "coding": DaemonWorkflowPhase(
+                    status: "completed",
+                    artifactId: "wf-1:coding",
+                    name: "代码生成结果",
+                    kind: "workflow-coding"
+                ),
+                "chat": DaemonWorkflowPhase(
+                    status: "completed",
+                    artifactId: "wf-1:chat",
+                    name: "需求澄清结果",
+                    kind: "workflow-chat"
+                ),
+                "code_review": DaemonWorkflowPhase(
+                    status: "pending",
+                    artifactId: nil,
+                    name: "代码评审",
+                    kind: "workflow-code-review"
+                ),
+            ],
+            artifacts: [
+                DaemonWorkflowArtifact(
+                    artifactId: "wf-1:coding",
+                    stage: "coding",
+                    name: "代码生成结果",
+                    kind: "workflow-coding",
+                    status: "completed"
+                )
+            ]
+        )
+        let events = DaemonProjectWorkflowEvents(
+            workflowId: "wf-1",
+            threadId: "thread-1",
+            projectId: "project-1",
+            projectName: "Demo",
+            currentPhase: "coding_complete",
+            currentStep: "coding",
+            status: "running",
+            awaitingUserInput: false,
+            error: nil,
+            events: [
+                DaemonWorkflowEvent(
+                    id: "wf-1:log:0",
+                    sequence: 9,
+                    type: "log",
+                    stage: "coding",
+                    title: "过程事件",
+                    detail: "tool:file_search",
+                    status: "completed",
+                    artifactId: nil
+                )
+            ]
+        )
+
+        let snapshot = DomainMapper.mapWorkflowSnapshot(status: status, events: events)
+
+        XCTAssertEqual(snapshot.status, .running)
+        XCTAssertEqual(snapshot.phases.map(\.stage), ["chat", "coding", "code_review"])
+        XCTAssertEqual(snapshot.phases[1].artifactID, "wf-1:coding")
+        XCTAssertEqual(snapshot.artifacts.first?.stage, "coding")
+        XCTAssertEqual(snapshot.events.first?.detail, "tool:file_search")
+    }
+
     // MARK: - Alert Level Mapping
 
     func testAlertLevelMapping() {

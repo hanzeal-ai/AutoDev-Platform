@@ -50,4 +50,24 @@ extension DaemonClient {
             try IPCPayloadDecoder.decode(DaemonProjectStageDetailPayload.self, from: payload).detail
         }
     }
+
+    func getProjectWorkflowStatus(projectID: String) async throws -> DaemonProjectWorkflowStatus {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.getProjectWorkflowStatusQuery,
+            payload: Self.projectIDPayload(projectID),
+            expectedResponse: IPCContract.MessageType.getProjectWorkflowStatusSuccess
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonProjectWorkflowStatusPayload.self, from: payload).workflow
+        }
+    }
+
+    func listProjectWorkflowEvents(projectID: String) async throws -> DaemonProjectWorkflowEvents {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.listProjectWorkflowEventsQuery,
+            payload: Self.projectIDPayload(projectID),
+            expectedResponse: IPCContract.MessageType.listProjectWorkflowEventsSuccess
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonProjectWorkflowEventsPayload.self, from: payload).workflowEvents
+        }
+    }
 }

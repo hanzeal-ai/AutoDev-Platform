@@ -119,15 +119,54 @@ fn request_via_workflow(
 
     update_project_from_workflow_status(store, project_id, &workflow_status)?;
     persist_workflow_outputs(store, project_id, workflow_id, &workflow_status)?;
-    insert_stage_event(
-        store,
-        project_id,
-        stage,
-        "统一 Workflow 已写入结果",
-        "PRD、需求评审、研发计划、编码结果、代码评审与完成总结已写入项目阶段数据。",
-    )?;
-    upsert_ai_run(store, run_id, project_id, stage, "completed", None)?;
-    Ok(true)
+    let workflow_run_status = workflow_status
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("running");
+    match workflow_run_status {
+        "completed" => {
+            insert_stage_event(
+                store,
+                project_id,
+                stage,
+                "统一 Workflow 已完成",
+                "需求澄清、可行性报告、PRD、需求评审、研发计划、编码、代码评审与完成总结已写入项目数据。",
+            )?;
+            upsert_ai_run(store, run_id, project_id, stage, "completed", None)?;
+            Ok(true)
+        }
+        "awaiting_user_input" => {
+            insert_stage_event(
+                store,
+                project_id,
+                stage,
+                "统一 Workflow 等待补充信息",
+                "需求澄清阶段判断现有信息不足，补充信息后可继续执行。",
+            )?;
+            upsert_ai_run(store, run_id, project_id, stage, "awaiting_user_input", None)?;
+            Ok(false)
+        }
+        "failed" | "blocked" => {
+            let reason = workflow_status
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("Workflow 未完成");
+            insert_stage_event(store, project_id, stage, "统一 Workflow 未完成", reason)?;
+            upsert_ai_run(store, run_id, project_id, stage, workflow_run_status, Some(reason))?;
+            Ok(false)
+        }
+        _ => {
+            insert_stage_event(
+                store,
+                project_id,
+                stage,
+                "统一 Workflow 已更新状态",
+                "Workflow 已返回最新状态，后续可继续刷新查看进度。",
+            )?;
+            upsert_ai_run(store, run_id, project_id, stage, workflow_run_status, None)?;
+            Ok(false)
+        }
+    }
 }
 
 fn update_project_from_workflow_status(

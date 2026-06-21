@@ -7,6 +7,8 @@ protocol DaemonQuerying {
     func listProjects() async throws -> [DaemonProject]
     func listCreationThreads() async throws -> [DaemonCreationThread]
     func getProjectStageDetail(projectID: String, stage: String?, subStep: String?) async throws -> DaemonProjectStageDetail
+    func getProjectWorkflowStatus(projectID: String) async throws -> DaemonProjectWorkflowStatus
+    func listProjectWorkflowEvents(projectID: String) async throws -> DaemonProjectWorkflowEvents
     func createCreationThread() async throws -> DaemonCommandResult
     func renameCreationThread(threadID: String, title: String) async throws
     func archiveCreationThread(threadID: String) async throws
@@ -15,6 +17,8 @@ protocol DaemonQuerying {
     func addCreationMessageStreaming(threadID: String, content: String) -> CreationStreamingHandle
     func addCreationMaterials(threadID: String, paths: [String]) async throws
     func runProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult
+    func startProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult
+    func resumeProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult
     func deleteProject(projectID: String) async throws
 }
 

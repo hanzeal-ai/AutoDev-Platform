@@ -35,6 +35,12 @@ pub(super) fn dispatch(
         protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW => Some(
             run_project_workflow::handle_run(inbound, runtime_paths),
         ),
+        protocol::MESSAGE_COMMAND_START_PROJECT_WORKFLOW => Some(
+            run_project_workflow::handle_start(inbound, runtime_paths),
+        ),
+        protocol::MESSAGE_COMMAND_RESUME_PROJECT_WORKFLOW => Some(
+            run_project_workflow::handle_resume(inbound, runtime_paths),
+        ),
         protocol::MESSAGE_COMMAND_DELETE_PROJECT => {
             Some(delete_project::handle_delete(inbound, runtime_paths))
         }

@@ -145,6 +145,9 @@ enum DomainMapper {
     }
 
     static func mapCreationMessage(_ dto: DaemonCreationMessage) -> CreationConversationMessage? {
+        if dto.role != "user", dto.content == "新线程已建立。请先描述你想交付的系统目标。" {
+            return nil
+        }
         guard let messageID = UUID(uuidString: dto.id) else {
             StructuredLogWriter.write(component: "autodev-app", level: "WARN", message: "invalid message UUID: \(dto.id)")
             return nil

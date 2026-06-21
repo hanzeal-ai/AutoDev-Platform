@@ -61,6 +61,15 @@ pub(crate) fn request_workflow_status(workflow_id: &str) -> StoreResult<Value> {
     )
 }
 
+pub(crate) fn request_workflow_events(workflow_id: &str) -> StoreResult<Value> {
+    post_worker_json(
+        "/workflow/events",
+        json!({ "workflow_id": workflow_id }),
+        Duration::from_secs(30),
+        "workflow events",
+    )
+}
+
 pub(crate) fn request_workflow_resume(workflow_id: &str) -> StoreResult<Value> {
     post_worker_json(
         "/workflow/resume",

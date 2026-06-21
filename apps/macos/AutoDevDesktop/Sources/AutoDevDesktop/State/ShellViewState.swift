@@ -30,6 +30,7 @@ struct ShellViewState {
     var lifecycleDistribution: [LifecycleStageItem]
     var stageBlueprints: [DeliveryLifecycleStage: StageViewBlueprint]
     var executionDetails: [ProjectExecutionDetailKey: DeliveryExecutionDetail]
+    var workflowSnapshots: [UUID: DeliveryWorkflowSnapshot]
     var opsSnapshot: DeliveryOpsSnapshot
     var userProfile: UserProfileSummary
     var daemonStatus: String

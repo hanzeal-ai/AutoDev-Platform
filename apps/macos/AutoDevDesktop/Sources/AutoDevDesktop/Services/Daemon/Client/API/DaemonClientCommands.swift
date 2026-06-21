@@ -65,6 +65,28 @@ extension DaemonClient {
         }
     }
 
+    func startProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.startProjectWorkflowCommand,
+            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback),
+            expectedResponse: IPCContract.MessageType.startProjectWorkflowSuccess,
+            timeoutSeconds: 900
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
+        }
+    }
+
+    func resumeProjectWorkflow(projectID: String, feedback: String?) async throws -> DaemonCommandResult {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.resumeProjectWorkflowCommand,
+            payload: Self.runProjectWorkflowPayload(projectID: projectID, feedback: feedback),
+            expectedResponse: IPCContract.MessageType.resumeProjectWorkflowSuccess,
+            timeoutSeconds: 900
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonCommandResult.self, from: payload)
+        }
+    }
+
     func deleteProject(projectID: String) async throws {
         _ = try await sendDecodedRequest(
             messageType: IPCContract.MessageType.deleteProjectCommand,
