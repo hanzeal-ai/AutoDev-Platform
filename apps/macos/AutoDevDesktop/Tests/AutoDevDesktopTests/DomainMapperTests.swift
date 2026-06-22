@@ -110,19 +110,25 @@ final class DomainMapperTests: XCTestCase {
                     status: "completed",
                     artifactId: "wf-1:coding",
                     name: "代码生成结果",
-                    kind: "workflow-coding"
+                    kind: "workflow-coding",
+                    fileName: "coding.json",
+                    filePath: "/tmp/coding.json"
                 ),
                 "chat": DaemonWorkflowPhase(
                     status: "completed",
                     artifactId: "wf-1:chat",
                     name: "需求澄清结果",
-                    kind: "workflow-chat"
+                    kind: "workflow-chat",
+                    fileName: nil,
+                    filePath: nil
                 ),
                 "code_review": DaemonWorkflowPhase(
                     status: "pending",
                     artifactId: nil,
                     name: "代码评审",
-                    kind: "workflow-code-review"
+                    kind: "workflow-code-review",
+                    fileName: nil,
+                    filePath: nil
                 ),
             ],
             artifacts: [
@@ -131,7 +137,9 @@ final class DomainMapperTests: XCTestCase {
                     stage: "coding",
                     name: "代码生成结果",
                     kind: "workflow-coding",
-                    status: "completed"
+                    status: "completed",
+                    fileName: "coding.json",
+                    filePath: "/tmp/coding.json"
                 )
             ]
         )
@@ -161,11 +169,72 @@ final class DomainMapperTests: XCTestCase {
 
         let snapshot = DomainMapper.mapWorkflowSnapshot(status: status, events: events)
 
-        XCTAssertEqual(snapshot.status, .running)
-        XCTAssertEqual(snapshot.phases.map(\.stage), ["chat", "coding", "code_review"])
-        XCTAssertEqual(snapshot.phases[1].artifactID, "wf-1:coding")
+        XCTAssertEqual(snapshot.status, DeliveryWorkflowNodeStatus.running)
+        XCTAssertEqual(snapshot.phases.map(\.stage), ["coding", "code_review"])
+        XCTAssertEqual(snapshot.phases[0].artifactID, "wf-1:coding")
+        XCTAssertEqual(snapshot.phases[0].fileName, "coding.json")
+        XCTAssertEqual(snapshot.phases[0].filePath, "/tmp/coding.json")
         XCTAssertEqual(snapshot.artifacts.first?.stage, "coding")
+        XCTAssertEqual(snapshot.artifacts.first?.fileName, "coding.json")
         XCTAssertEqual(snapshot.events.first?.detail, "tool:file_search")
+    }
+
+    func testWorkflowSnapshotMapsEveryVisibleStageAndStatus() {
+        let status = DaemonProjectWorkflowStatus(
+            workflowId: "wf-status",
+            threadId: "thread-status",
+            projectId: "project-status",
+            projectName: "Demo",
+            currentPhase: "code_review_blocked",
+            currentStep: "code_review",
+            status: "blocked",
+            awaitingUserInput: false,
+            error: nil,
+            phases: [
+                "prd": workflowPhase(status: "completed", stage: "prd"),
+                "prd_review": workflowPhase(status: "awaiting_user_input", stage: "prd_review"),
+                "development": workflowPhase(status: "failed", stage: "development"),
+                "coding": workflowPhase(status: "running", stage: "coding"),
+                "code_review": workflowPhase(status: "blocked", stage: "code_review"),
+                "summary": workflowPhase(status: "not_started", stage: "summary"),
+                "report": workflowPhase(status: "completed", stage: "report"),
+            ],
+            artifacts: []
+        )
+
+        let snapshot = DomainMapper.mapWorkflowSnapshot(status: status, events: nil)
+
+        XCTAssertEqual(snapshot.status, DeliveryWorkflowNodeStatus.blocked)
+        XCTAssertEqual(snapshot.phases.map(\.stage), DomainMapper.workflowStageOrder)
+        XCTAssertEqual(snapshot.phases.map(\.status), [
+            .completed,
+            .awaitingUserInput,
+            .failed,
+            .running,
+            .blocked,
+            .notStarted,
+        ])
+    }
+
+    func testWorkflowStatusPresentationLabelsCoverAllNodeStatuses() {
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .notStarted), "未开始")
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .pending), "等待")
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .running), "执行中")
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .completed), "完成")
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .failed), "失败")
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .blocked), "阻塞")
+        XCTAssertEqual(ProjectWorkflowStatusPresentation.label(for: .awaitingUserInput), "待补充")
+    }
+
+    private func workflowPhase(status: String, stage: String) -> DaemonWorkflowPhase {
+        DaemonWorkflowPhase(
+            status: status,
+            artifactId: "wf-status:\(stage)",
+            name: stage,
+            kind: "workflow-\(stage)",
+            fileName: "\(stage).json",
+            filePath: "/tmp/\(stage).json"
+        )
     }
 
     // MARK: - Alert Level Mapping

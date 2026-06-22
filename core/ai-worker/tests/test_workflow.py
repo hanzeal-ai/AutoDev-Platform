@@ -21,6 +21,7 @@ from autodev_ai.workflow import (
     _phase_result,
     workflow_config,
 )
+from autodev_ai.workflow_runtime.schema import WORKFLOW_ARTIFACTS, WORKFLOW_ORDER
 
 
 @pytest.mark.anyio
@@ -663,6 +664,45 @@ def test_workflow_status_grays_downstream_after_code_review_revision():
     assert status["phases"]["code_review"]["name"] == "第 1 轮代码评审"
     assert status["phases"]["summary"]["status"] == "pending"
     assert status["phases"]["summary"]["artifact_id"] is None
+
+
+@pytest.mark.parametrize("stage", WORKFLOW_ORDER)
+@pytest.mark.parametrize(
+    ("phase_suffix", "state_patch", "expected_status"),
+    [
+        ("running", {}, "running"),
+        ("failed", {"error": "boom"}, "failed"),
+        ("blocked", {}, "blocked"),
+        ("waiting", {"awaiting_user_input": True}, "awaiting_user_input"),
+    ],
+)
+def test_workflow_status_marks_each_current_phase_state(stage, phase_suffix, state_patch, expected_status):
+    current_phase = f"{stage}_{phase_suffix}"
+    status = build_workflow_status(
+        {
+            "workflow_id": f"wf-{stage}-{phase_suffix}",
+            "current_phase": current_phase,
+            **_completed_artifacts_before(stage),
+            **state_patch,
+        }
+    )
+
+    assert status["current_step"] == stage
+    assert status["phases"][stage]["status"] == expected_status
+
+
+def _completed_artifacts_before(stage: str) -> dict[str, dict[str, str]]:
+    stage_index = WORKFLOW_ORDER.index(stage)
+    return {
+        WORKFLOW_ARTIFACTS[previous_stage]["state_key"]: _completed_artifact(previous_stage)
+        for previous_stage in WORKFLOW_ORDER[:stage_index]
+    }
+
+
+def _completed_artifact(stage: str) -> dict[str, object]:
+    if stage.endswith("_review"):
+        return {"approved": True, "summary": f"{stage} approved", "issues": []}
+    return {"ok": stage}
 
 
 def test_workflow_events_include_blocked_review_reason():
