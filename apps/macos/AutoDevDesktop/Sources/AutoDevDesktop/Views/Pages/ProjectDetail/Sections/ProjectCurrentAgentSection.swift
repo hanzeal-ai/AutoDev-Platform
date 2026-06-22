@@ -4,6 +4,9 @@ struct ProjectCurrentAgentSection: View {
     let snapshot: DeliveryWorkflowSnapshot?
     let detail: DeliveryExecutionDetail?
     let projectName: String
+    @State private var now = Date()
+
+    private let ticker = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         DashboardCard(title: "当前 Agent 执行") {
@@ -14,6 +17,7 @@ struct ProjectCurrentAgentSection: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .onReceive(ticker) { now = $0 }
     }
 
     private var header: some View {
@@ -29,12 +33,13 @@ struct ProjectCurrentAgentSection: View {
             Spacer()
             HStack(spacing: 6) {
                 Circle()
-                    .fill(statusColor(for: snapshot?.status ?? .pending))
+                    .fill(activityColor)
                     .frame(width: 8, height: 8)
-                Text(statusLabel(for: snapshot?.status ?? .pending))
+                Text(WorkflowActivityPresentation.label(for: activity))
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(statusColor(for: snapshot?.status ?? .pending))
+                    .foregroundColor(activityColor)
             }
+            .help(activityDetail)
         }
     }
 
@@ -54,6 +59,9 @@ struct ProjectCurrentAgentSection: View {
             AgentNoticeLine(systemImage: "exclamationmark.triangle.fill", title: "执行失败", detail: error)
         } else if snapshot.status == .blocked {
             AgentNoticeLine(systemImage: "pause.circle.fill", title: "流程阻塞", detail: latestDetail(fallback: "等待人工确认或补充处理。"))
+        } else if activity == .waitingFirstToken || activity == .idleSuspected {
+            AgentNoticeLine(systemImage: activity == .idleSuspected ? "exclamationmark.circle.fill" : "hourglass", title: WorkflowActivityPresentation.label(for: activity), detail: activityDetail)
+            executionEvents
         } else if snapshot.currentStep == "coding", !fileNames.isEmpty {
             fileSummary
             executionEvents
@@ -158,6 +166,18 @@ struct ProjectCurrentAgentSection: View {
         "\(stageTitle(for: snapshot?.currentStep ?? "not_started")) Agent"
     }
 
+    private var activity: DeliveryWorkflowActivityState {
+        WorkflowActivityPresentation.activity(snapshot: snapshot, detail: detail, now: now)
+    }
+
+    private var activityColor: Color {
+        WorkflowActivityPresentation.color(for: activity)
+    }
+
+    private var activityDetail: String {
+        WorkflowActivityPresentation.detail(for: activity, snapshot: snapshot, detail: detail, now: now)
+    }
+
     private var fileNames: [String] {
         let unitNames = (detail?.workUnits ?? []).map(\.title).filter { !$0.isEmpty }
         if !unitNames.isEmpty {
@@ -197,10 +217,6 @@ struct ProjectCurrentAgentSection: View {
 
     private func stageTitle(for stage: String) -> String {
         ProjectWorkflowStatusPresentation.title(for: stage)
-    }
-
-    private func statusColor(for status: DeliveryWorkflowNodeStatus) -> Color {
-        ProjectWorkflowStatusPresentation.color(for: status)
     }
 
     private func statusLabel(for status: DeliveryWorkflowNodeStatus) -> String {

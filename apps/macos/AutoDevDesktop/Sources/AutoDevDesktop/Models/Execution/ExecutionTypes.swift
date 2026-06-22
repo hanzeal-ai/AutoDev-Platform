@@ -67,6 +67,18 @@ enum DeliveryWorkflowNodeStatus: String, Equatable {
     case awaitingUserInput = "awaiting_user_input"
 }
 
+enum DeliveryWorkflowActivityState: Equatable {
+    case loading
+    case notStarted
+    case running
+    case waitingFirstToken
+    case idleSuspected
+    case awaitingUserInput
+    case blocked
+    case failed
+    case completed
+}
+
 struct DeliveryWorkflowPhase: Identifiable, Equatable {
     let id: String
     var stage: String

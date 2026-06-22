@@ -212,11 +212,26 @@ def _stage_is_stale_after_revision(
 
 
 def _phase_name(state: Mapping[str, Any], stage: str, fallback: str) -> str:
+    if stage == "prd":
+        return f"第 {_prd_round(state)} 轮产品需求文档"
+    if stage == "prd_review":
+        return f"第 {_prd_review_round(state)} 轮需求评审"
     if stage == "coding":
         return f"第 {_coding_round(state)} 轮代码开发"
     if stage == "code_review":
         return f"第 {_code_review_round(state)} 轮代码评审"
     return fallback
+
+
+def _prd_round(state: Mapping[str, Any]) -> int:
+    return max(1, int(state.get("prd_review_iteration") or 0) + 1)
+
+
+def _prd_review_round(state: Mapping[str, Any]) -> int:
+    completed_reviews = int(state.get("prd_review_iteration") or 0)
+    if active_step_from_state(state) == "prd_review" and not state.get("prd_review_result"):
+        return max(1, completed_reviews + 1)
+    return max(1, completed_reviews)
 
 
 def _coding_round(state: Mapping[str, Any]) -> int:
