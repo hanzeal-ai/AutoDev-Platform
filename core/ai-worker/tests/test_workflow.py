@@ -695,7 +695,7 @@ async def test_report_node_converts_llm_error_to_failed_state(monkeypatch):
     async def fake_generate_report(ctx, cfg):
         raise RuntimeError("insufficient balance")
 
-    monkeypatch.setattr("autodev_ai.workflow.generate_report", fake_generate_report)
+    monkeypatch.setattr("autodev_ai.graphs.workflow.nodes.generate_report", fake_generate_report)
 
     result = await report_node(
         {
@@ -724,7 +724,7 @@ async def test_report_node_normalizes_insufficient_balance_error(monkeypatch):
     async def fake_generate_report(ctx, cfg):
         raise RuntimeError(raw_error)
 
-    monkeypatch.setattr("autodev_ai.workflow.generate_report", fake_generate_report)
+    monkeypatch.setattr("autodev_ai.graphs.workflow.nodes.generate_report", fake_generate_report)
 
     result = await report_node(
         {
@@ -757,7 +757,7 @@ async def test_coding_node_merges_openspec_step_events(monkeypatch):
                 "error": None,
             }
 
-    monkeypatch.setattr("autodev_ai.workflow._coding_graph", FakeCodingGraph())
+    monkeypatch.setattr("autodev_ai.graphs.workflow.nodes._coding_graph", FakeCodingGraph())
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test")
 
     result = await coding_node(
@@ -800,7 +800,7 @@ async def test_subgraph_nodes_convert_worker_errors_to_failed_state(
         async def ainvoke(self, worker_state):
             raise RuntimeError(f"{node_name} interrupted")
 
-    monkeypatch.setattr(f"autodev_ai.workflow.{graph_attr}", FailingGraph())
+    monkeypatch.setattr(f"autodev_ai.graphs.workflow.nodes.{graph_attr}", FailingGraph())
 
     result = await node(
         {
@@ -836,7 +836,7 @@ async def test_review_nodes_convert_llm_errors_to_failed_state(
         async def ainvoke(self, messages, config=None):
             raise RuntimeError(f"{node_name} unavailable")
 
-    monkeypatch.setattr("autodev_ai.workflow.create_llm", lambda *args, **kwargs: FailingLLM())
+    monkeypatch.setattr("autodev_ai.graphs.workflow.nodes.create_llm", lambda *args, **kwargs: FailingLLM())
 
     result = await node(
         {
@@ -899,7 +899,7 @@ async def test_chat_node_continues_when_existing_draft_is_complete_and_patch_is_
     async def fake_generate_chat(ctx, cfg):
         return FakeChatResult()
 
-    monkeypatch.setattr("autodev_ai.workflow.generate_chat", fake_generate_chat)
+    monkeypatch.setattr("autodev_ai.graphs.workflow.nodes.generate_chat", fake_generate_chat)
     state = {
         "thread_id": "thread-1",
         "user_message": "小红书自动热点推文系统",
@@ -951,9 +951,9 @@ async def test_resume_restarts_awaiting_chat_when_existing_draft_is_complete(mon
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 
@@ -987,9 +987,9 @@ async def test_resume_continues_after_completed_checkpoint(monkeypatch):
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 
@@ -1024,9 +1024,9 @@ async def test_resume_retries_failed_report_from_previous_checkpoint(monkeypatch
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 
@@ -1078,9 +1078,9 @@ async def test_resume_retries_failed_downstream_node(
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 
@@ -1114,9 +1114,9 @@ async def test_resume_skips_current_node_and_continues(monkeypatch):
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 
@@ -1150,9 +1150,9 @@ async def test_resume_reruns_current_node_from_previous_checkpoint(monkeypatch):
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 
@@ -1186,9 +1186,9 @@ async def test_resume_retries_blocked_review_node(monkeypatch):
         captured["node"] = node
         return {"workflow_id": workflow_id, "status": "running"}
 
-    monkeypatch.setattr("autodev_ai.workflow._get_checkpoint_state", fake_get_checkpoint_state)
+    monkeypatch.setattr("autodev_ai.workflow_runtime.service._get_checkpoint_state", fake_get_checkpoint_state)
     monkeypatch.setattr(
-        "autodev_ai.workflow._resume_persistent_workflow_after_node",
+        "autodev_ai.workflow_runtime.service._resume_persistent_workflow_after_node",
         fake_resume_persistent_workflow_after_node,
     )
 

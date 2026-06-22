@@ -148,7 +148,7 @@ extension ShellViewModel {
                     {
                         try await refreshLiveSnapshot()
                         state.openProjectDetail(projectID: projectID, from: .projectLibrary)
-                        state.selectDetailStage(.development)
+                        state.selectDetailStage(.prd)
                         await refreshSelectedProjectDetail()
                     } else {
                         state.selectCreationThread(threadID)

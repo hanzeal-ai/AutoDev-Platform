@@ -70,7 +70,7 @@ fn request_via_workflow(
         project_id,
         stage,
         "系统：启动统一 Workflow",
-        "已切换到 Python 统一 workflow，包含需求澄清、可行性报告、PRD、需求评审、研发计划、编码、代码评审与完成总结。",
+        "已切换到 Python 统一 workflow，将从 PRD、需求评审、研发计划、编码、代码评审与完成总结依次推进。",
     )?;
     upsert_ai_run(
         store,
@@ -134,7 +134,7 @@ fn request_via_workflow(
                 project_id,
                 stage,
                 "统一 Workflow 已完成",
-                "需求澄清、可行性报告、PRD、需求评审、研发计划、编码、代码评审与完成总结已写入项目数据。",
+                "PRD、需求评审、研发计划、编码、代码评审与完成总结已写入项目数据。",
             )?;
             upsert_ai_run(store, run_id, project_id, stage, "completed", None)?;
             Ok(true)
@@ -145,7 +145,7 @@ fn request_via_workflow(
                 project_id,
                 stage,
                 "统一 Workflow 等待补充信息",
-                "需求澄清阶段判断现有信息不足，补充信息后可继续执行。",
+                "当前阶段判断现有信息不足，补充信息后可继续执行。",
             )?;
             upsert_ai_run(store, run_id, project_id, stage, "awaiting_user_input", None)?;
             Ok(false)

@@ -74,6 +74,8 @@ struct DeliveryWorkflowPhase: Identifiable, Equatable {
     var kind: String
     var status: DeliveryWorkflowNodeStatus
     var artifactID: String?
+    var fileName: String?
+    var filePath: String?
 }
 
 struct DeliveryWorkflowEventItem: Identifiable, Equatable {

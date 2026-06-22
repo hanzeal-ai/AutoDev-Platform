@@ -28,7 +28,6 @@ impl Store {
             .map_err(|err| err.to_string())?;
 
         self.touch_thread(thread_id, now)?;
-        self.trigger_creation_workflow(&project_id)?;
         Ok(json!({
             "thread_id": thread_id,
             "assistant_message": assistant_message,
@@ -113,8 +112,7 @@ impl Store {
             .map_err(|err| err.to_string())?;
 
         self.touch_thread(&thread_id, ai_now)?;
-        self.trigger_creation_workflow(&project_id)?;
-        let _ = on_delta("统一 workflow 已启动，将依次生成可行性分析、PRD、研发计划、代码结果与评审。");
+        let _ = on_delta("可行性报告已准备好，确认后将从 PRD 阶段进入 workflow。");
         Ok(json!({
             "thread_id": thread_id,
             "assistant_message": assistant_message,
@@ -157,13 +155,13 @@ WHERE t.id = ?1
 INSERT INTO projects (
   id, title, current_phase, lifecycle_stage, progress, current_goal, next_action,
   risk, block_reason, status, owner, updated_at_ms, created_at_ms
-) VALUES (?1, ?2, 'Workflow', 'development', 0.05, ?3, ?4, 'medium', NULL, 'running', '系统代理', ?5, ?6)
+) VALUES (?1, ?2, 'Workflow', 'prd', 0.05, ?3, ?4, 'medium', NULL, 'awaiting_confirmation', '系统代理', ?5, ?6)
 "#,
                 params![
                     project_id,
                     project_title,
-                    "统一 workflow 已启动，等待阶段产物生成",
-                    "等待 workflow 写入阶段产物",
+                    "可行性报告已准备好，等待确认进入 PRD",
+                    "确认可行性报告后启动 PRD workflow",
                     now,
                     now
                 ],
@@ -171,7 +169,7 @@ INSERT INTO projects (
             .map_err(|err| err.to_string())?;
         self.conn
             .execute(
-                "UPDATE creation_threads SET linked_project_id = ?1, lifecycle_stage = 'development', last_updated_ms = ?2 WHERE id = ?3",
+            "UPDATE creation_threads SET linked_project_id = ?1, lifecycle_stage = 'feasibility', last_updated_ms = ?2 WHERE id = ?3",
                 params![project_id, now, thread_id],
             )
             .map_err(|err| err.to_string())?;
@@ -191,7 +189,7 @@ INSERT INTO projects (
 UPDATE feasibility_reports
 SET project_name = ?1,
     problem_definition = ?2,
-    feasibility_conclusion = '统一 workflow 已启动',
+    feasibility_conclusion = '可行性报告已准备好，确认后进入 PRD Workflow',
     updated_at_ms = ?3
 WHERE thread_id = ?4
 "#,
@@ -199,11 +197,6 @@ WHERE thread_id = ?4
             )
             .map_err(|err| err.to_string())?;
         Ok(())
-    }
-
-    fn trigger_creation_workflow(&self, project_id: &str) -> StoreResult<()> {
-        self.run_project_workflow(project_id, None, None)
-            .map(|_| ())
     }
 
     fn ensure_active_creation_thread(&self, thread_id: &str) -> StoreResult<()> {
@@ -243,7 +236,7 @@ fn workflow_project_title(user_message: &str) -> String {
 
 fn workflow_started_message(project_title: &str) -> String {
     format!(
-        "已创建项目「{}」并启动统一 workflow。我会从需求澄清、可行性分析、PRD、需求评审、研发计划、代码生成到代码评审依次推进。",
+        "已创建项目「{}」并生成可行性报告草稿。确认后将进入 Workflow，并从 PRD 阶段开始推进。",
         project_title
     )
 }

@@ -26,7 +26,7 @@ from .models import (
     ReportContext,
     StageContext,
 )
-from .workflow import build_workflow_graph
+from .graphs.workflow import build_workflow_graph
 
 
 class StudioState(TypedDict, total=False):

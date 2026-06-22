@@ -27,6 +27,8 @@ struct DaemonWorkflowPhase: Decodable {
     let artifactId: String?
     let name: String
     let kind: String
+    let fileName: String?
+    let filePath: String?
 }
 
 struct DaemonWorkflowArtifact: Decodable {
@@ -35,6 +37,8 @@ struct DaemonWorkflowArtifact: Decodable {
     let name: String
     let kind: String
     let status: String
+    let fileName: String?
+    let filePath: String?
 }
 
 struct DaemonProjectWorkflowEvents: Decodable {

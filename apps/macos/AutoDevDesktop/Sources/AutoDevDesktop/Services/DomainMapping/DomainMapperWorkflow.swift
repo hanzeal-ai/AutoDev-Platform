@@ -2,8 +2,6 @@ import Foundation
 
 extension DomainMapper {
     static let workflowStageOrder = [
-        "chat",
-        "report",
         "prd",
         "prd_review",
         "development",
@@ -27,7 +25,9 @@ extension DomainMapper {
                 title: artifact.name,
                 kind: artifact.kind,
                 status: workflowNodeStatus(from: artifact.status),
-                artifactID: artifact.artifactId
+                artifactID: artifact.artifactId,
+                fileName: artifact.fileName,
+                filePath: artifact.filePath
             )
         }
         return DeliveryWorkflowSnapshot(
@@ -60,7 +60,9 @@ extension DomainMapper {
             title: phase.name,
             kind: phase.kind,
             status: workflowNodeStatus(from: phase.status),
-            artifactID: phase.artifactId
+            artifactID: phase.artifactId,
+            fileName: phase.fileName,
+            filePath: phase.filePath
         )
     }
 

@@ -245,7 +245,9 @@
             "OBJ_357",
             "OBJ_359",
             "OBJ_361",
-            "OBJ_363"
+            "OBJ_363",
+            "OBJ_365",
+            "OBJ_367"
          );
       };
       "OBJ_106" = {
@@ -862,7 +864,9 @@
             "OBJ_282",
             "OBJ_283",
             "OBJ_284",
-            "OBJ_362"
+            "OBJ_362",
+            "OBJ_364",
+            "OBJ_366"
          );
          name = "Sections";
          path = "Sections";
@@ -1719,6 +1723,24 @@
       "OBJ_363" = {
          isa = "PBXBuildFile";
          fileRef = "OBJ_362";
+      };
+      "OBJ_364" = {
+         isa = "PBXFileReference";
+         path = "ProjectCurrentAgentSection.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_365" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_364";
+      };
+      "OBJ_366" = {
+         isa = "PBXFileReference";
+         path = "ProjectWorkflowStatusPresentation.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_367" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_366";
       };
       "OBJ_59" = {
          isa = "PBXFileReference";

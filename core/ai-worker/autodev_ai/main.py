@@ -14,7 +14,7 @@ from .models import (
     WorkflowResumeContext,
     WorkflowStartContext,
 )
-from .workflow import (
+from .workflow_runtime.service import (
     get_workflow_artifact,
     get_workflow_events,
     get_workflow_status,
