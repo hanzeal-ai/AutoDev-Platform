@@ -9,17 +9,23 @@ struct ContentView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            AppSidebar(viewModel: viewModel)
-            Divider()
-
-            VStack(spacing: 0) {
-                AppHeader(viewModel: viewModel)
-                Divider()
+        Group {
+            if viewModel.state.daemonStatus == "Unknown" || !viewModel.state.isAuthenticated {
                 pageBody
+            } else {
+                HStack(spacing: 0) {
+                    AppSidebar(viewModel: viewModel)
+                    Divider()
+
+                    VStack(spacing: 0) {
+                        AppHeader(viewModel: viewModel)
+                        Divider()
+                        pageBody
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(viewModel.state.appearanceMode.colorScheme)
@@ -61,37 +67,39 @@ struct ContentView: View {
 
     @ViewBuilder
     private var pageBody: some View {
-        Group {
-            if viewModel.state.daemonStatus == "Unknown" {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .controlSize(.regular)
-                    Text("正在连接系统…")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("正在连接系统")
-            } else if viewModel.state.route.isProjectCreation {
-                ProjectCreationPage(viewModel: viewModel)
-            } else {
-                ScrollView {
-                    switch viewModel.state.route {
-                    case .overview:
-                        OverviewPage(viewModel: viewModel)
-                    case .projectLibrary:
-                        ProjectLibraryPage(viewModel: viewModel)
-                    case .projectCreation:
-                        EmptyView()
-                    case .projectDetail:
-                        ProjectDetailPage(viewModel: viewModel)
-                    }
+        if viewModel.state.daemonStatus == "Unknown" {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("正在连接系统…")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("正在连接系统")
+        } else if !viewModel.state.isAuthenticated {
+            LoginPage(viewModel: viewModel)
+        } else if viewModel.state.route.isProjectCreation {
+            ProjectCreationPage(viewModel: viewModel)
+                .padding(20)
+        } else {
+            ScrollView {
+                switch viewModel.state.route {
+                case .overview:
+                    OverviewPage(viewModel: viewModel)
+                case .projectLibrary:
+                    ProjectLibraryPage(viewModel: viewModel)
+                case .projectCreation:
+                    EmptyView()
+                case .projectDetail:
+                    ProjectDetailPage(viewModel: viewModel)
                 }
             }
+            .padding(20)
         }
-        .padding(20)
     }
+
 }
 
 #if DEBUG

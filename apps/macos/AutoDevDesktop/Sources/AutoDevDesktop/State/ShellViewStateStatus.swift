@@ -96,7 +96,24 @@ extension ShellViewState {
     }
 
     mutating func noteSignOutTapped() {
-        statusMessage = "退出登录动作已触发，等待认证模块接入。"
+        isAuthenticated = false
+        userProfile = Self.defaultUserProfile()
+        loginPassword = ""
+        loginError = ""
+        statusMessage = "已退出登录"
+    }
+
+    mutating func applyLogin(user: UserProfileSummary) {
+        userProfile = user
+        isAuthenticated = true
+        loginPassword = ""
+        loginError = ""
+        statusMessage = "登录成功"
+    }
+
+    mutating func applyLoginError(_ message: String) {
+        loginError = message
+        statusMessage = "登录失败"
     }
 
     mutating func dismissError() {

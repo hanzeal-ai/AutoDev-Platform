@@ -17,6 +17,14 @@ private struct PreviewDaemonClient: DaemonQuerying {
         )
     }
 
+    func login(username _: String, password _: String) async throws -> DaemonAuthenticatedUser {
+        DaemonAuthenticatedUser(
+            displayName: "管理员",
+            email: "admin@autodev.local",
+            currentPlan: "测试环境"
+        )
+    }
+
     func getOverview() async throws -> DaemonOverviewPayload {
         throw DaemonClientError.malformedResponse
     }

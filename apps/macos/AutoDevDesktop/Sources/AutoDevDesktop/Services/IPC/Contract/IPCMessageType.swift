@@ -17,6 +17,8 @@ extension IPCContract {
         static let listProjectWorkflowEventsQuery = "query.list_project_workflow_events"
         static let listProjectWorkflowEventsSuccess = "query.list_project_workflow_events.ok"
 
+        static let loginCommand = "command.login"
+        static let loginSuccess = "command.login.ok"
         static let createCreationThreadCommand = "command.create_creation_thread"
         static let createCreationThreadSuccess = "command.create_creation_thread.ok"
         static let renameCreationThreadCommand = "command.rename_creation_thread"

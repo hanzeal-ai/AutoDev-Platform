@@ -23,18 +23,22 @@ extension ShellViewModel {
             do {
                 let health = try await daemonClient.getHealth()
                 state.apply(health: health)
-                do {
-                    try await refreshLiveSnapshot()
-                } catch {
-                    state.apply(operationError: error, context: "同步控制面数据")
-                }
-            } catch {
-                if let health = await DaemonBootstrapper.waitForHealth(using: daemonClient) {
-                    state.apply(health: health)
+                if state.isAuthenticated {
                     do {
                         try await refreshLiveSnapshot()
                     } catch {
                         state.apply(operationError: error, context: "同步控制面数据")
+                    }
+                }
+            } catch {
+                if let health = await DaemonBootstrapper.waitForHealth(using: daemonClient) {
+                    state.apply(health: health)
+                    if state.isAuthenticated {
+                        do {
+                            try await refreshLiveSnapshot()
+                        } catch {
+                            state.apply(operationError: error, context: "同步控制面数据")
+                        }
                     }
                     return
                 }

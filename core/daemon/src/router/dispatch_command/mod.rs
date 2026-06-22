@@ -1,3 +1,4 @@
+mod auth;
 mod creation_messages;
 mod creation_threads;
 mod delete_project;
@@ -14,6 +15,7 @@ pub(super) fn dispatch(
     runtime_paths: &runtime::RuntimePaths,
 ) -> Option<Result<(&'static str, Value), String>> {
     match inbound.message_type.as_str() {
+        protocol::MESSAGE_COMMAND_LOGIN => Some(auth::handle_login(inbound, runtime_paths)),
         protocol::MESSAGE_COMMAND_CREATE_CREATION_THREAD => {
             Some(creation_threads::handle_create(runtime_paths))
         }

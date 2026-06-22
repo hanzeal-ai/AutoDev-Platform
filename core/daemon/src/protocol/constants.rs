@@ -17,6 +17,8 @@ pub const MESSAGE_QUERY_LIST_PROJECT_WORKFLOW_EVENTS: &str = "query.list_project
 pub const MESSAGE_QUERY_LIST_PROJECT_WORKFLOW_EVENTS_OK: &str =
     "query.list_project_workflow_events.ok";
 
+pub const MESSAGE_COMMAND_LOGIN: &str = "command.login";
+pub const MESSAGE_COMMAND_LOGIN_OK: &str = "command.login.ok";
 pub const MESSAGE_COMMAND_CREATE_CREATION_THREAD: &str = "command.create_creation_thread";
 pub const MESSAGE_COMMAND_CREATE_CREATION_THREAD_OK: &str = "command.create_creation_thread.ok";
 pub const MESSAGE_COMMAND_RENAME_CREATION_THREAD: &str = "command.rename_creation_thread";

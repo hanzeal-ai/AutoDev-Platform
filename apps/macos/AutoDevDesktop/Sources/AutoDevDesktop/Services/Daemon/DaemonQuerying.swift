@@ -2,6 +2,7 @@ import Foundation
 
 protocol DaemonQuerying {
     var apiBaseURL: URL { get }
+    func login(username: String, password: String) async throws -> DaemonAuthenticatedUser
     func getHealth() async throws -> DaemonHealth
     func getOverview() async throws -> DaemonOverviewPayload
     func listProjects() async throws -> [DaemonProject]

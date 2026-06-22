@@ -1,6 +1,16 @@
 import Foundation
 
 extension DaemonClient {
+    func login(username: String, password: String) async throws -> DaemonAuthenticatedUser {
+        try await sendDecodedRequest(
+            messageType: IPCContract.MessageType.loginCommand,
+            payload: Self.loginPayload(username: username, password: password),
+            expectedResponse: IPCContract.MessageType.loginSuccess
+        ) { payload in
+            try IPCPayloadDecoder.decode(DaemonLoginPayload.self, from: payload).user
+        }
+    }
+
     func createCreationThread() async throws -> DaemonCommandResult {
         try await sendDecodedRequest(
             messageType: IPCContract.MessageType.createCreationThreadCommand,

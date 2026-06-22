@@ -247,7 +247,9 @@
             "OBJ_361",
             "OBJ_363",
             "OBJ_365",
-            "OBJ_367"
+            "OBJ_367",
+            "OBJ_370",
+            "OBJ_372"
          );
       };
       "OBJ_106" = {
@@ -579,7 +581,8 @@
             "OBJ_21",
             "OBJ_22",
             "OBJ_23",
-            "OBJ_358"
+            "OBJ_358",
+            "OBJ_369"
          );
          name = "Daemon";
          path = "Daemon";
@@ -1742,6 +1745,33 @@
          isa = "PBXBuildFile";
          fileRef = "OBJ_366";
       };
+      "OBJ_368" = {
+         isa = "PBXGroup";
+         children = (
+            "OBJ_371"
+         );
+         name = "Login";
+         path = "Login";
+         sourceTree = "<group>";
+      };
+      "OBJ_369" = {
+         isa = "PBXFileReference";
+         path = "DaemonAuthDTO.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_370" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_369";
+      };
+      "OBJ_371" = {
+         isa = "PBXFileReference";
+         path = "LoginPage.swift";
+         sourceTree = "<group>";
+      };
+      "OBJ_372" = {
+         isa = "PBXBuildFile";
+         fileRef = "OBJ_371";
+      };
       "OBJ_59" = {
          isa = "PBXFileReference";
          path = "CardComponents.swift";
@@ -1859,6 +1889,7 @@
          isa = "PBXGroup";
          children = (
             "OBJ_74",
+            "OBJ_368",
             "OBJ_76",
             "OBJ_78",
             "OBJ_88"

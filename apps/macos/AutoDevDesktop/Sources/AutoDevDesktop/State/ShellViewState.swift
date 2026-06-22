@@ -33,6 +33,10 @@ struct ShellViewState {
     var workflowSnapshots: [UUID: DeliveryWorkflowSnapshot]
     var opsSnapshot: DeliveryOpsSnapshot
     var userProfile: UserProfileSummary
+    var isAuthenticated: Bool
+    var loginUsername: String
+    var loginPassword: String
+    var loginError: String
     var daemonStatus: String
     var daemonVersion: String
     var protocolVersion: String

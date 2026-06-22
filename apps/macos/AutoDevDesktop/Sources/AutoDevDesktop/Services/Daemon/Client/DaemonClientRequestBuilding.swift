@@ -1,6 +1,13 @@
 import Foundation
 
 extension DaemonClient {
+    static func loginPayload(username: String, password: String) -> [String: Any] {
+        [
+            "username": username,
+            "password": password,
+        ]
+    }
+
     static func projectStageDetailPayload(projectID: String, stage: String?, subStep: String? = nil) -> [String: Any] {
         var payload: [String: Any] = ["project_id": projectID]
         if let stage = stage {
