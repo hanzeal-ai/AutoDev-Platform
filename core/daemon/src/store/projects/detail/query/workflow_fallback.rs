@@ -68,7 +68,8 @@ ORDER BY created_at_ms ASC
             "title": row.get::<_, String>(2)?,
             "detail": row.get::<_, String>(3)?,
             "status": "completed",
-            "artifact_id": null
+            "artifact_id": null,
+            "created_at_ms": row.get::<_, i64>(4)?
         }))
     });
     if let Ok(rows) = rows {

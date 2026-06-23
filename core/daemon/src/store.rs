@@ -59,8 +59,13 @@ pub(super) type StoreResult<T> = Result<T, String>;
 
 impl Store {
     pub fn open(paths: &RuntimePaths) -> StoreResult<Self> {
-        let conn = Connection::open(paths.db_path())
-            .map_err(|err| format!("failed to open database at {}: {}", paths.db_path().display(), err))?;
+        let conn = Connection::open(paths.db_path()).map_err(|err| {
+            format!(
+                "failed to open database at {}: {}",
+                paths.db_path().display(),
+                err
+            )
+        })?;
         conn.execute_batch(
             r#"
 PRAGMA foreign_keys = ON;

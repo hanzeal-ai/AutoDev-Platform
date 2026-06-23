@@ -26,3 +26,4 @@ __pycache__/
 .env
 .langgraph_api/
 .checkpoints/
+.codex/skills/

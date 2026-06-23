@@ -22,6 +22,7 @@ from autodev_ai.workflow import (
     workflow_config,
 )
 from autodev_ai.workflow_runtime.schema import WORKFLOW_ARTIFACTS, WORKFLOW_ORDER
+from autodev_ai.workflow_runtime.service import _merge_custom_stream_event
 
 
 @pytest.mark.anyio
@@ -960,7 +961,7 @@ async def test_chat_node_continues_when_existing_draft_is_complete_and_patch_is_
     assert result["awaiting_user_input"] is False
     assert result["current_phase"] == "chat_complete"
     assert result["events"] == [
-        "chat: 准备执行需求澄清 Agent",
+        "chat: 正在思考用户需求是否清晰，并判断是否需要补充信息",
         "chat: 需求澄清完成",
     ]
 
@@ -1078,6 +1079,7 @@ async def test_resume_retries_failed_report_from_previous_checkpoint(monkeypatch
     assert captured["state"]["current_phase"] == "chat_complete"
     assert captured["state"]["error"] is None
     assert captured["state"]["events"][-1] == "report: 重新执行"
+    assert captured["state"]["events"] == ["report: 重新执行"]
 
 
 @pytest.mark.anyio
@@ -1100,13 +1102,14 @@ async def test_resume_retries_failed_downstream_node(
     retry_event,
 ):
     captured = {}
+    failed_stage = failed_phase.removesuffix("_failed")
     state = {
         "workflow_id": "wf-node-failed",
         "thread_id": "thread-1",
         "current_phase": failed_phase,
         "awaiting_user_input": False,
         "error": "temporary failure",
-        "events": [f"{failed_phase}: 执行失败：temporary failure"],
+        "events": [f"{failed_stage}: 执行失败：temporary failure"],
     }
 
     async def fake_get_checkpoint_state(workflow_id):
@@ -1131,6 +1134,7 @@ async def test_resume_retries_failed_downstream_node(
     assert captured["state"]["current_phase"] == resume_phase
     assert captured["state"]["error"] is None
     assert captured["state"]["events"][-1] == retry_event
+    assert captured["state"]["events"] == [retry_event]
 
 
 @pytest.mark.anyio
@@ -1239,6 +1243,40 @@ async def test_resume_retries_blocked_review_node(monkeypatch):
     assert captured["state"]["current_phase"] == "coding_complete"
     assert captured["state"]["error"] is None
     assert captured["state"]["events"][-1] == "code_review: 重新执行"
+    assert captured["state"]["events"] == ["code_review: 重新执行"]
+
+
+def test_custom_stream_failure_marks_workflow_failed():
+    state = {
+        "workflow_id": "wf-custom",
+        "thread_id": "thread-1",
+        "project_id": "project-1",
+        "project_name": "Demo",
+        "current_phase": "coding_running",
+        "awaiting_user_input": False,
+        "events": ["coding: 正在使用 OpenSpec 模式生成提案：账号登录"],
+    }
+
+    event = _merge_custom_stream_event(
+        state,
+        (
+            "custom",
+            {
+                "type": "workflow_log",
+                "stage": "coding",
+                "detail": "coding: 执行失败：OpenSpec 文档评审达到上限",
+            },
+        ),
+        "wf-custom",
+    )
+
+    assert state["current_phase"] == "coding_failed"
+    assert state["error"] == "OpenSpec 文档评审达到上限"
+    assert event is not None
+    assert event["workflow_status"] == "failed"
+    assert event["status"]["status"] == "failed"
+    assert event["status"]["phases"]["coding"]["status"] == "failed"
+    assert event["event"]["status"] == "failed"
 
 
 def test_phase_result_raises_on_worker_error_for_checkpoint_resume():

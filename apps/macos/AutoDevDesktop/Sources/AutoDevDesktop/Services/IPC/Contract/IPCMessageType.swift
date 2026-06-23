@@ -42,9 +42,13 @@ extension IPCContract {
 
         // Streaming creation message
         static let addCreationMessageStreamCommand = "command.add_creation_message_stream"
+        static let runProjectWorkflowStreamCommand = "command.run_project_workflow_stream"
         static let creationMessageDelta = "event.creation_message.delta"
         static let creationMessageDone = "event.creation_message.done"
         static let creationMessageError = "event.creation_message.error"
+        static let projectWorkflowUpdate = "event.project_workflow.update"
+        static let projectWorkflowDone = "event.project_workflow.done"
+        static let projectWorkflowError = "event.project_workflow.error"
 
         static let error = "error"
     }

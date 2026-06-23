@@ -99,6 +99,7 @@ struct DeliveryWorkflowEventItem: Identifiable, Equatable {
     var detail: String
     var status: DeliveryWorkflowNodeStatus
     var artifactID: String?
+    var createdAtMS: Int?
 }
 
 struct DeliveryWorkflowSnapshot: Equatable {

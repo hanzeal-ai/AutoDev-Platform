@@ -64,7 +64,10 @@ mod tests {
         store.init_schema().unwrap();
         seed_projects(&store);
         // Blocked = blocked, failed → p3
-        assert_eq!(store.count_projects(ProjectCountFilter::Blocked).unwrap(), 1);
+        assert_eq!(
+            store.count_projects(ProjectCountFilter::Blocked).unwrap(),
+            1
+        );
     }
 
     #[test]
@@ -72,7 +75,10 @@ mod tests {
         let store = Store::open_in_memory().unwrap();
         store.init_schema().unwrap();
         seed_projects(&store);
-        assert_eq!(store.count_projects(ProjectCountFilter::Completed).unwrap(), 1);
+        assert_eq!(
+            store.count_projects(ProjectCountFilter::Completed).unwrap(),
+            1
+        );
     }
 
     #[test]
@@ -88,7 +94,10 @@ mod tests {
         let store = Store::open_in_memory().unwrap();
         store.init_schema().unwrap();
         seed_projects(&store);
-        assert_eq!(store.count_projects(ProjectCountFilter::Awaiting).unwrap(), 1);
+        assert_eq!(
+            store.count_projects(ProjectCountFilter::Awaiting).unwrap(),
+            1
+        );
     }
 
     #[test]

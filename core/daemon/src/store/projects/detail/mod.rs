@@ -7,10 +7,10 @@ use super::super::reports::llm::worker;
 use super::super::{Store, StoreResult};
 use crate::logger;
 use serde_json::{json, Value};
+use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
-use std::path::Path;
 
 impl Store {
     pub fn run_project_workflow(
@@ -113,6 +113,49 @@ impl Store {
             "project_id": project_id,
             "stage": active_stage,
             "started": true
+        }))
+    }
+
+    pub fn run_project_workflow_streaming<F>(
+        &self,
+        project_id: &str,
+        _feedback: Option<&str>,
+        action: Option<&str>,
+        mode: &str,
+        on_event: F,
+    ) -> StoreResult<Value>
+    where
+        F: FnMut(Value) -> StoreResult<()>,
+    {
+        let project_id = project_id.trim().to_lowercase();
+        let project = query::load_project(self, &project_id)?;
+        let active_stage = if project.lifecycle_stage.is_empty() {
+            "development".to_string()
+        } else {
+            project.lifecycle_stage.clone()
+        };
+        let feasibility = self.project_feasibility_context(&project_id)?;
+        let project_title = if project.title.is_empty() {
+            "项目".to_string()
+        } else {
+            project.title.clone()
+        };
+        let run_id = ai_stage::create_stage_ai_run(self, &project_id, &active_stage)?;
+        let completed = ai_stage::generate_stage_ai_content_streaming(
+            self,
+            &run_id,
+            &project_id,
+            &project_title,
+            &active_stage,
+            feasibility.as_ref(),
+            action,
+            mode,
+            on_event,
+        )?;
+        Ok(json!({
+            "project_id": project_id,
+            "stage": active_stage,
+            "completed": completed
         }))
     }
 
@@ -385,7 +428,9 @@ impl Store {
         ];
 
         for (workflow_stage, artifact_stages) in stage_mappings {
-            let Some(artifact) = self.latest_workflow_stage_artifact(project_id, artifact_stages)? else {
+            let Some(artifact) =
+                self.latest_workflow_stage_artifact(project_id, artifact_stages)?
+            else {
                 continue;
             };
             let artifact_id = artifact
@@ -431,9 +476,10 @@ impl Store {
                 "file_path": file_path
             });
             if let Some(artifacts) = workflow.get_mut("artifacts").and_then(Value::as_array_mut) {
-                if let Some(existing) = artifacts.iter_mut().find(|item| {
-                    item.get("stage").and_then(Value::as_str) == Some(workflow_stage)
-                }) {
+                if let Some(existing) = artifacts
+                    .iter_mut()
+                    .find(|item| item.get("stage").and_then(Value::as_str) == Some(workflow_stage))
+                {
                     *existing = artifact_entry;
                 } else {
                     artifacts.push(artifact_entry);

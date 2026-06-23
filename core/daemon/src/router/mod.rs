@@ -8,7 +8,11 @@ use crate::runtime;
 use std::io::Write;
 
 pub fn is_streaming_command(inbound: &protocol::EnvelopeIn) -> bool {
-    inbound.message_type == protocol::MESSAGE_COMMAND_ADD_CREATION_MESSAGE_STREAM
+    matches!(
+        inbound.message_type.as_str(),
+        protocol::MESSAGE_COMMAND_ADD_CREATION_MESSAGE_STREAM
+            | protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW_STREAM
+    )
 }
 
 pub fn route_request(
@@ -62,6 +66,15 @@ pub fn route_streaming_request(
     match inbound.message_type.as_str() {
         protocol::MESSAGE_COMMAND_ADD_CREATION_MESSAGE_STREAM => {
             dispatch_command::dispatch_streaming_add_message(
+                &inbound,
+                runtime_paths,
+                writer,
+                &correlation_id,
+                schema_version,
+            );
+        }
+        protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW_STREAM => {
+            dispatch_command::dispatch_streaming_project_workflow(
                 &inbound,
                 runtime_paths,
                 writer,

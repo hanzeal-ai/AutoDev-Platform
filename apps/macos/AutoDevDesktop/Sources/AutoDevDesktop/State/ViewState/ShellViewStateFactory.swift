@@ -61,6 +61,7 @@ extension ShellViewState {
             stageBlueprints: [:],
             executionDetails: [:],
             workflowSnapshots: [:],
+            workflowRawStreamLines: [:],
             opsSnapshot: defaultOpsSnapshot(),
             userProfile: defaultUserProfile(),
             isAuthenticated: false,

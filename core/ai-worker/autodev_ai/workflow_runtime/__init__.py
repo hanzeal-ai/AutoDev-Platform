@@ -18,6 +18,7 @@ _SERVICE_EXPORTS = {
     "get_workflow_status",
     "resume_workflow",
     "start_workflow",
+    "stream_workflow",
     "workflow_config",
 }
 
@@ -34,6 +35,7 @@ __all__ = [
     "get_workflow_status",
     "resume_workflow",
     "start_workflow",
+    "stream_workflow",
     "workflow_config",
 ]
 

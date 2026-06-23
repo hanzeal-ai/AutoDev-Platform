@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+import time
+from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
 from typing import Any
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ..graphs.workflow import build_workflow_graph
-from ..models import WorkflowStartContext
+from ..models import WorkflowStartContext, WorkflowStreamContext
 from .events import agent_title, append_event, append_event_once, prepare_event
 from .progress import active_step_from_state as _active_step_from_state
 from .progress import step_from_phase as _step_from_phase
@@ -94,6 +95,25 @@ async def get_workflow_artifact(workflow_id: str, artifact_id: str) -> dict[str,
     return build_workflow_artifact(await _get_checkpoint_state(workflow_id), artifact_id)
 
 
+async def stream_workflow(ctx: WorkflowStreamContext) -> AsyncIterator[dict[str, Any]]:
+    """Stream workflow snapshots while executing the checkpointed graph."""
+    workflow_id = ctx.workflow_id or ctx.thread_id
+    yield _stream_event("workflow_started", workflow_id, detail="workflow stream started")
+    try:
+        if ctx.mode == "start":
+            async for event in _stream_start_workflow(ctx, workflow_id):
+                yield event
+        else:
+            async for event in _stream_resume_workflow(ctx, workflow_id):
+                yield event
+    except Exception as exc:
+        yield {
+            "type": "workflow_error",
+            "workflow_id": workflow_id,
+            "detail": str(exc),
+        }
+
+
 async def _get_checkpoint_state(workflow_id: str) -> dict[str, Any]:
     checkpoint_path = get_workflow_checkpoint_path()
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -113,6 +133,327 @@ async def _invoke_persistent_workflow(
         graph = build_workflow_graph(checkpointer=checkpointer)
         result = await graph.ainvoke(state, config=workflow_config(workflow_id))
     return build_workflow_status(dict(result or {}))
+
+
+async def _stream_start_workflow(
+    ctx: WorkflowStreamContext,
+    workflow_id: str,
+) -> AsyncIterator[dict[str, Any]]:
+    state = ctx.model_dump()
+    mode = state.pop("mode", "start")
+    action = _normalize_workflow_action(str(state.pop("action", "continue")))
+    state["workflow_id"] = workflow_id
+    if action == "skip":
+        status = await _skip_current_step(state, workflow_id)
+        yield _stream_event("workflow_done", workflow_id, status=status, detail=f"{mode}: skip")
+        return
+    if action in {"rerun", "retry"}:
+        async for event in _stream_rerun_current_step(state, workflow_id):
+            yield event
+        return
+    if _draft_ready_for_report(state.get("draft") or {}):
+        state = _prepare_from_confirmed_feasibility(state)
+        async for event in _stream_resume_persistent_workflow_after_node(state, workflow_id, "report"):
+            yield event
+        return
+    state = _prepare_node_state(state, "chat")
+    async for event in _stream_invoke_persistent_workflow(state, workflow_id):
+        yield event
+
+
+async def _stream_resume_workflow(
+    ctx: WorkflowStreamContext,
+    workflow_id: str,
+) -> AsyncIterator[dict[str, Any]]:
+    state = await _get_checkpoint_state(workflow_id)
+    action = _normalize_workflow_action(ctx.action)
+    if action == "skip":
+        status = await _skip_current_step(state, workflow_id)
+        yield _stream_event("workflow_done", workflow_id, status=status, detail="resume: skip")
+        return
+    if action == "rerun":
+        async for event in _stream_rerun_current_step(state, workflow_id):
+            yield event
+        return
+    if _can_continue_from_awaiting_chat(state):
+        next_state = dict(state)
+        next_state["awaiting_user_input"] = False
+        next_state["current_phase"] = "chat_complete"
+        async for event in _stream_resume_persistent_workflow_after_node(next_state, workflow_id, "chat"):
+            yield event
+        return
+    retry = _retry_from_failed_phase(state)
+    if retry:
+        retry_state, retry_after = retry
+        async for event in _stream_resume_persistent_workflow_after_node(retry_state, workflow_id, retry_after):
+            yield event
+        return
+    if action == "retry":
+        async for event in _stream_rerun_current_step(state, workflow_id):
+            yield event
+        return
+    resume_after = _resume_node_from_completed_phase(state)
+    if resume_after:
+        async for event in _stream_resume_persistent_workflow_after_node(state, workflow_id, resume_after):
+            yield event
+        return
+    async for event in _stream_invoke_persistent_workflow(None, workflow_id):
+        yield event
+
+
+async def _stream_invoke_persistent_workflow(
+    state: AutoDevWorkflowState | None,
+    workflow_id: str,
+) -> AsyncIterator[dict[str, Any]]:
+    checkpoint_path = get_workflow_checkpoint_path()
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
+        graph = build_workflow_graph(checkpointer=checkpointer)
+        config = workflow_config(workflow_id)
+        merged_state: dict[str, Any] = dict(state or {})
+        status = build_workflow_status(merged_state)
+        yield _stream_event(
+            "workflow_update",
+            workflow_id,
+            status=status,
+            event=_latest_stream_log(merged_state, workflow_id, status),
+        )
+        async for chunk in graph.astream(state, config=config, stream_mode=["updates", "custom"]):
+            custom_event = _merge_custom_stream_event(merged_state, chunk, workflow_id)
+            if custom_event is not None:
+                yield custom_event
+                continue
+            _merge_stream_update(merged_state, chunk)
+            status = build_workflow_status(merged_state)
+            yield _stream_event(
+                "workflow_update",
+                workflow_id,
+                status=status,
+                event=_latest_stream_log(merged_state, workflow_id, status),
+            )
+        snapshot = await graph.aget_state(config)
+        final_state = dict(snapshot.values or merged_state)
+    status = build_workflow_status(final_state)
+    yield _stream_event(
+        "workflow_done",
+        workflow_id,
+        status=status,
+        event=_latest_stream_log(final_state, workflow_id, status),
+    )
+
+
+async def _stream_resume_persistent_workflow_after_node(
+    state: AutoDevWorkflowState,
+    workflow_id: str,
+    node: NodeName,
+) -> AsyncIterator[dict[str, Any]]:
+    checkpoint_path = get_workflow_checkpoint_path()
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
+        graph = build_workflow_graph(checkpointer=checkpointer)
+        config = workflow_config(workflow_id)
+        prepared = _prepare_node_state(state, _active_step_from_state(state))
+        await graph.aupdate_state(config, prepared, as_node=node)
+        merged_state: dict[str, Any] = dict(prepared)
+        status = build_workflow_status(merged_state)
+        yield _stream_event(
+            "workflow_update",
+            workflow_id,
+            status=status,
+            event=_latest_stream_log(merged_state, workflow_id, status),
+        )
+        async for chunk in graph.astream(None, config=config, stream_mode=["updates", "custom"]):
+            custom_event = _merge_custom_stream_event(merged_state, chunk, workflow_id)
+            if custom_event is not None:
+                yield custom_event
+                continue
+            _merge_stream_update(merged_state, chunk)
+            status = build_workflow_status(merged_state)
+            yield _stream_event(
+                "workflow_update",
+                workflow_id,
+                status=status,
+                event=_latest_stream_log(merged_state, workflow_id, status),
+            )
+        snapshot = await graph.aget_state(config)
+        final_state = dict(snapshot.values or merged_state)
+    status = build_workflow_status(final_state)
+    yield _stream_event(
+        "workflow_done",
+        workflow_id,
+        status=status,
+        event=_latest_stream_log(final_state, workflow_id, status),
+    )
+
+
+async def _stream_rerun_current_step(
+    state: Mapping[str, Any],
+    workflow_id: str,
+) -> AsyncIterator[dict[str, Any]]:
+    stage = _action_stage(state)
+    next_state = _reset_from_stage(state, stage)
+    next_state["awaiting_user_input"] = False
+    next_state["error"] = None
+    next_state["events"] = _events_without_stage(next_state, stage)
+    next_state["events"] = append_event(next_state, f"{stage}: 重新执行")
+    if stage == "chat":
+        next_state["current_phase"] = ""
+        async for event in _stream_invoke_persistent_workflow(_prepare_node_state(next_state, "chat"), workflow_id):
+            yield event
+        return
+    previous_node = WORKFLOW_PREVIOUS_NODE[stage]
+    next_state["current_phase"] = WORKFLOW_NODE_COMPLETE_PHASE[previous_node]
+    async for event in _stream_resume_persistent_workflow_after_node(next_state, workflow_id, previous_node):
+        yield event
+
+
+def _merge_stream_update(state: dict[str, Any], chunk: Any) -> None:
+    if isinstance(chunk, tuple) and len(chunk) == 2:
+        mode, payload = chunk
+        if mode != "updates":
+            return
+        chunk = payload
+    if not isinstance(chunk, Mapping):
+        return
+    for value in chunk.values():
+        if isinstance(value, Mapping):
+            state.update(value)
+
+
+def _merge_custom_stream_event(
+    state: dict[str, Any],
+    chunk: Any,
+    workflow_id: str,
+) -> dict[str, Any] | None:
+    if not (isinstance(chunk, tuple) and len(chunk) == 2 and chunk[0] == "custom"):
+        return None
+    payload = chunk[1]
+    if not isinstance(payload, Mapping) or payload.get("type") != "workflow_log":
+        return None
+    detail = str(payload.get("detail") or "").strip()
+    if not detail:
+        return None
+    events = list(state.get("events") or [])
+    if not events or events[-1] != detail:
+        events.append(detail)
+    state["events"] = events
+    stage = str(payload.get("stage") or _stage_from_event_detail(detail, str(state.get("current_step") or "")))
+    if stage in WORKFLOW_ARTIFACTS:
+        event_status = _stream_log_status(detail)
+        if event_status == "failed":
+            state["current_phase"] = f"{stage}_failed"
+            state["error"] = _event_error_message(detail)
+        elif event_status == "blocked":
+            state["current_phase"] = f"{stage}_blocked"
+            state["error"] = None
+        else:
+            state["current_phase"] = f"{stage}_running"
+            state["error"] = None
+    status = build_workflow_status(state)
+    return _stream_event(
+        "workflow_update",
+        workflow_id,
+        status=status,
+        event=_stream_log_event(
+            workflow_id,
+            sequence=len(events),
+            stage=stage,
+            detail=detail,
+        ),
+    )
+
+
+def _stream_event(
+    event_type: str,
+    workflow_id: str,
+    *,
+    status: dict[str, Any] | None = None,
+    detail: str = "",
+    event: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "type": event_type,
+        "workflow_id": workflow_id,
+    }
+    if detail:
+        payload["detail"] = detail
+    if status is not None:
+        payload["status"] = status
+        payload["current_step"] = status.get("current_step")
+        payload["workflow_status"] = status.get("status")
+    if event is not None:
+        payload["event"] = event
+    return payload
+
+
+def _latest_stream_log(
+    state: Mapping[str, Any],
+    workflow_id: str,
+    status: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    events = [str(item).strip() for item in state.get("events") or [] if str(item).strip()]
+    active_stage = str(status.get("current_step") or "")
+    if status.get("status") == "running" and active_stage in WORKFLOW_ARTIFACTS:
+        if not events or _stage_from_event_detail(events[-1], active_stage) != active_stage:
+            return _stream_log_event(
+                workflow_id,
+                sequence=len(events) + 1,
+                stage=active_stage,
+                detail=prepare_event(active_stage),
+            )
+    if not events:
+        return None
+    detail = events[-1]
+    stage = _stage_from_event_detail(detail, active_stage)
+    return _stream_log_event(
+        workflow_id,
+        sequence=len(events),
+        stage=stage,
+        detail=detail,
+    )
+
+
+def _stream_log_event(
+    workflow_id: str,
+    *,
+    sequence: int,
+    stage: str,
+    detail: str,
+) -> dict[str, Any]:
+    return {
+        "id": f"{workflow_id}:stream:{sequence}",
+        "sequence": sequence,
+        "type": "log",
+        "stage": stage,
+        "title": "过程事件",
+        "detail": detail[:2048],
+        "status": _stream_log_status(detail),
+        "artifact_id": None,
+        "created_at_ms": _now_ms(),
+    }
+
+
+def _stage_from_event_detail(detail: str, fallback: str) -> str:
+    prefix = detail.split(":", 1)[0].strip()
+    if prefix in WORKFLOW_ARTIFACTS:
+        return prefix
+    return fallback or "workflow"
+
+
+def _stream_log_status(detail: str) -> str:
+    if "失败" in detail:
+        return "failed"
+    if "阻塞" in detail:
+        return "blocked"
+    if "补充" in detail:
+        return "awaiting_user_input"
+    if "准备" in detail or "正在" in detail or "重新执行" in detail:
+        return "running"
+    return "completed"
+
+
+def _now_ms() -> int:
+    return int(time.time() * 1000)
 
 
 async def _resume_persistent_workflow_after_node(
@@ -158,6 +499,7 @@ async def _rerun_current_step(
     next_state = _reset_from_stage(state, stage)
     next_state["awaiting_user_input"] = False
     next_state["error"] = None
+    next_state["events"] = _events_without_stage(next_state, stage)
     next_state["events"] = append_event(next_state, f"{stage}: 重新执行")
     if stage == "chat":
         next_state["current_phase"] = ""
@@ -298,8 +640,25 @@ def _retry_from_failed_phase(
     retry_state["error"] = None
     retry_state["awaiting_user_input"] = False
     retry_state["current_phase"] = WORKFLOW_NODE_COMPLETE_PHASE[previous_node]
+    retry_state["events"] = _events_without_stage(retry_state, failed_stage)
     retry_state["events"] = append_event(retry_state, f"{failed_stage}: 重新执行")
     return retry_state, previous_node
+
+
+def _events_without_stage(state: Mapping[str, Any], stage: str) -> list[str]:
+    prefix = f"{stage}:"
+    return [
+        str(event)
+        for event in state.get("events") or []
+        if not str(event).strip().startswith(prefix)
+    ]
+
+
+def _event_error_message(detail: str) -> str:
+    marker = "执行失败："
+    if marker in detail:
+        return detail.split(marker, 1)[1].strip()[:2048]
+    return detail.strip()[:2048]
 
 
 def _can_continue_from_awaiting_chat(state: Mapping[str, Any]) -> bool:

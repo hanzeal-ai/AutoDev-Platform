@@ -6,8 +6,8 @@ mod server;
 mod store;
 
 use std::error::Error;
-use std::sync::Arc;
 use std::process;
+use std::sync::Arc;
 
 fn main() {
     if let Err(err) = run() {

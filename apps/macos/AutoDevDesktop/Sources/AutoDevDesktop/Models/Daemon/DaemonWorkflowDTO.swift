@@ -63,4 +63,5 @@ struct DaemonWorkflowEvent: Decodable {
     let detail: String
     let status: String
     let artifactId: String?
+    let createdAtMs: Int?
 }

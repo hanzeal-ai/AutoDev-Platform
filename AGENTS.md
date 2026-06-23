@@ -61,7 +61,7 @@ Target: macOS 12+. Use SwiftUI Preview in `ContentView.swift` for fast UI iterat
 core/ai-worker/.venv/bin/pytest core/ai-worker/tests -q
 ```
 
-Requires model credentials from local `.env`. The worker may create local OpenSpec assets under `docs/` or `openspec/` while coding, but API keys and local generated caches must remain uncommitted.
+Requires model credentials from local `.env`. OpenSpec is used only inside the coding phase for the generated target project. Its `openspec/` and generated Codex skill files must be created under that target project's workspace, not inside this AutoDev platform repository.
 
 ## Architecture Conventions
 

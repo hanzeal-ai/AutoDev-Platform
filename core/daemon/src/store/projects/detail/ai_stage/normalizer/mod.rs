@@ -8,9 +8,7 @@ pub(crate) use dev::{persist_development_coding, persist_development_task_breakd
 pub(crate) use prd::persist_prd_content;
 #[allow(unused_imports)]
 pub(crate) use workflow::{
-    persist_generic_workflow_artifact,
-    persist_workflow_review,
-    persist_workflow_summary,
+    persist_generic_workflow_artifact, persist_workflow_review, persist_workflow_summary,
 };
 
 /// Strip path-traversal characters from a path component (project_id, stage).

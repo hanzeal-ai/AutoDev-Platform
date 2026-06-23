@@ -237,6 +237,7 @@ async def coding_node(state: AutoDevWorkflowState) -> dict[str, Any]:
             project_id=_required(state, "project_id"),
             project_name=_project_name(state, state.get("feasibility_report", {})),
             task_breakdown=task_breakdown,
+            project_workspace=_coding_workspace(state),
         )
         worker_state: CodingState = {
             "context": ctx,
@@ -275,6 +276,7 @@ async def code_review_node(state: AutoDevWorkflowState) -> dict[str, Any]:
             project_id=_required(state, "project_id"),
             project_name=project_name,
             task_breakdown=state.get("development_plan", {}),
+            project_workspace=_coding_workspace(state),
         )
         llm = create_llm(ModelConfig.from_env(), max_tokens=1800, json_mode=True)
         response = await retry_async(
@@ -342,3 +344,10 @@ async def summary_node(state: AutoDevWorkflowState) -> dict[str, Any]:
         "error": None,
         "events": append_event(state, "summary: Workflow 完成总结已生成"),
     }
+
+
+def _coding_workspace(state: AutoDevWorkflowState) -> str:
+    workspace = str(state.get("project_workspace") or state.get("workspace_path") or "").strip()
+    if workspace:
+        return workspace
+    return str(state.get("project_id") or "").strip()

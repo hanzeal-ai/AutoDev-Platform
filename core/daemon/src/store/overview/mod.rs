@@ -2,8 +2,8 @@ mod counts;
 mod feeds;
 mod lifecycle;
 
-use counts::ProjectCountFilter;
 use super::{Store, StoreResult};
+use counts::ProjectCountFilter;
 use serde_json::{json, Value};
 
 impl Store {

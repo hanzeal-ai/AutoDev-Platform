@@ -27,7 +27,6 @@ from ..config import ModelConfig
 from ..llm import create_llm
 from ..models import CodingContext
 from ..retry import retry_async
-from ..text_tools import deduped_string_list as _string_list
 from ..tracing import build_trace_config
 
 OPENSPEC_FLOW_STEPS: dict[str, str] = {
@@ -49,6 +48,7 @@ class CodingProvider(Protocol):
         ctx: CodingContext,
         cfg: ModelConfig,
         tasks: list[dict[str, Any]],
+        event_sink: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
         """Return coding narrative and provider-specific task artifacts."""
 
@@ -62,6 +62,7 @@ class LegacyCodingProvider:
         ctx: CodingContext,
         cfg: ModelConfig,
         tasks: list[dict[str, Any]],
+        event_sink: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
         task_breakdown_text = json.dumps(ctx.task_breakdown, ensure_ascii=False)
         coding_plan_text = json.dumps(tasks, ensure_ascii=False)
@@ -99,6 +100,8 @@ class LegacyCodingProvider:
                 if delta:
                     full_reply += delta
                     deltas.append(delta)
+                    if event_sink is not None:
+                        event_sink(delta)
 
         await retry_async(_stream)
         return {"coding_reply": full_reply, "deltas": deltas, "openspec_tasks": []}
@@ -124,18 +127,25 @@ class OpenSpecSkillProvider:
         ctx: CodingContext,
         cfg: ModelConfig,
         tasks: list[dict[str, Any]],
+        event_sink: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
-        project_root = _resolve_project_root(self.project_root)
-        deltas: list[str] = [_openspec_event("bootstrap")]
+        project_root = _resolve_project_root(self.project_root, ctx)
+        deltas: list[str] = []
+
+        def emit(event: str) -> None:
+            deltas.append(event)
+            if event_sink is not None:
+                event_sink(event)
+
+        emit(_openspec_event("bootstrap"))
         skills = _OpenSpecSkills.load(self.skill_root or _ensure_openspec_ready(project_root))
         task_results: list[dict[str, Any]] = []
         replies: list[str] = []
 
         for task in tasks:
-            result = await self._run_one_task(ctx, cfg, skills, task, project_root)
+            result = await self._run_one_task(ctx, cfg, skills, task, project_root, emit)
             task_results.append(result)
             replies.append(str(result.get("apply_reply") or ""))
-            deltas.extend(_string_list(result.get("events"), 20, 512))
 
         return {
             "coding_reply": "\n\n".join(reply for reply in replies if reply.strip()),
@@ -150,9 +160,15 @@ class OpenSpecSkillProvider:
         skills: "_OpenSpecSkills",
         task: Mapping[str, Any],
         project_root: Path,
+        emit: Callable[[str], None],
     ) -> dict[str, Any]:
         events: list[str] = []
-        events.append(_openspec_event("propose", task))
+
+        def add_event(event: str) -> None:
+            events.append(event)
+            emit(event)
+
+        add_event(_openspec_event("propose", task))
         proposal = await _json_llm(
             cfg,
             ctx,
@@ -160,7 +176,7 @@ class OpenSpecSkillProvider:
             system=skills.propose,
             user=_propose_prompt(ctx, task),
         )
-        events.append(_openspec_event("docs", task))
+        add_event(_openspec_event("docs", task))
         docs = _normalize_docs(proposal)
         change_dir = _write_change_docs(project_root, docs)
         review_iterations = 0
@@ -168,7 +184,7 @@ class OpenSpecSkillProvider:
 
         while review_iterations < self.max_review_iterations:
             review_iterations += 1
-            events.append(_openspec_event("review", task, iteration=review_iterations))
+            add_event(_openspec_event("review", task, iteration=review_iterations))
             review_result = await _json_llm(
                 cfg,
                 ctx,
@@ -178,7 +194,7 @@ class OpenSpecSkillProvider:
             )
             if bool(review_result.get("approved")):
                 break
-            events.append(_openspec_event("revise", task, iteration=review_iterations))
+            add_event(_openspec_event("revise", task, iteration=review_iterations))
             docs = _normalize_docs(
                 await _json_llm(
                     cfg,
@@ -188,7 +204,7 @@ class OpenSpecSkillProvider:
                     user=_revise_prompt(ctx, task, docs, review_result),
                 )
             )
-            events.append(_openspec_event("docs", task))
+            add_event(_openspec_event("docs", task))
             change_dir = _write_change_docs(project_root, docs)
 
         if not bool(review_result.get("approved")):
@@ -197,7 +213,7 @@ class OpenSpecSkillProvider:
                 f"OpenSpec 文档评审达到上限（{self.max_review_iterations} 次）仍未通过：{task_title}"
             )
 
-        events.append(_openspec_event("apply", task))
+        add_event(_openspec_event("apply", task))
         apply_reply = await _text_llm(
             cfg,
             ctx,
@@ -205,7 +221,7 @@ class OpenSpecSkillProvider:
             system=skills.apply,
             user=_apply_prompt(ctx, task, docs),
         )
-        events.append(_openspec_event("archive", task))
+        add_event(_openspec_event("archive", task))
         archive_note = await _text_llm(
             cfg,
             ctx,
@@ -214,7 +230,7 @@ class OpenSpecSkillProvider:
             user=_archive_prompt(ctx, task, docs),
         )
         archive_dir = _archive_change_docs(project_root, docs, archive_note)
-        events.append(_openspec_event("complete", task))
+        add_event(_openspec_event("complete", task))
 
         return {
             "task_id": str(task.get("id") or ""),
@@ -277,20 +293,32 @@ def _openspec_event(
 
 def _candidate_skill_roots() -> list[Path]:
     roots: list[Path] = []
-    for base in _project_roots():
-        roots.append(base / ".codex" / "skills")
+    default_root = _default_generated_projects_root()
+    if default_root.exists():
+        for project_root in default_root.iterdir():
+            if project_root.is_dir():
+                roots.append(project_root / ".codex" / "skills")
     codex_home = os.environ.get("CODEX_HOME")
     roots.append(Path(codex_home).expanduser() / "skills" if codex_home else Path.home() / ".codex" / "skills")
     return roots
 
 
-def _resolve_project_root(configured: Path | None = None) -> Path:
+def _resolve_project_root(configured: Path | None = None, ctx: CodingContext | None = None) -> Path:
     if configured is not None:
-        return configured.expanduser().resolve()
+        return _reject_platform_root(configured.expanduser().resolve())
+    workspace = str(getattr(ctx, "project_workspace", "") or "").strip()
+    if workspace:
+        path = Path(workspace).expanduser()
+        if not path.is_absolute():
+            path = _default_generated_projects_root() / _safe_workspace_name(workspace)
+        return _reject_platform_root(path.resolve())
     env_root = os.environ.get("AUTODEV_PROJECT_ROOT", "").strip()
     if env_root:
-        return Path(env_root).expanduser().resolve()
-    return Path.cwd().resolve()
+        return _reject_platform_root(Path(env_root).expanduser().resolve())
+    project_id = str(getattr(ctx, "project_id", "") or "").strip()
+    if project_id:
+        return (_default_generated_projects_root() / _safe_workspace_name(project_id)).resolve()
+    raise RuntimeError("缺少目标项目 workspace，OpenSpec 不能写入 AutoDev 平台仓库。")
 
 
 def _ensure_openspec_ready(project_root: Path) -> Path:
@@ -474,15 +502,32 @@ def _node_bin_dir() -> Path:
     return _node_install_dir() / archive_stem / "bin"
 
 
-def _project_roots() -> list[Path]:
-    roots = [Path.cwd()]
-    here = Path(__file__).resolve()
-    roots.extend(here.parents)
-    unique: list[Path] = []
-    for root in roots:
-        if root not in unique:
-            unique.append(root)
-    return unique
+def _default_generated_projects_root() -> Path:
+    configured = os.environ.get("AUTODEV_GENERATED_PROJECTS_ROOT", "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (Path.home() / ".autodev" / "generated-projects").resolve()
+
+
+def _safe_workspace_name(value: str) -> str:
+    sanitized = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in value.strip())
+    return sanitized[:128] or "project"
+
+
+def _reject_platform_root(path: Path) -> Path:
+    platform_root = _platform_repo_root()
+    try:
+        path.relative_to(platform_root)
+    except ValueError:
+        return path
+    raise RuntimeError(
+        f"OpenSpec 目标目录不能位于 AutoDev 平台仓库内：{path}。"
+        "请为具体生成项目设置 project_workspace 或 AUTODEV_GENERATED_PROJECTS_ROOT。"
+    )
+
+
+def _platform_repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
 
 
 def _read_skill(roots: list[Path | None], skill_name: str) -> str:

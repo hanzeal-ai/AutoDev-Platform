@@ -3,6 +3,7 @@
 import pytest
 
 from autodev_ai.config import ModelConfig
+from autodev_ai.graphs import coding as coding_module
 from autodev_ai.graphs.coding import (
     _normalize_coding_plan,
     document_provider_node,
@@ -66,10 +67,37 @@ def test_openspec_flow_steps_are_centrally_defined():
     assert OPENSPEC_FLOW_STEPS["apply"] == "正在使用 OpenSpec 模式执行实现"
 
 
+def test_openspec_project_root_defaults_to_generated_project_workspace(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTODEV_GENERATED_PROJECTS_ROOT", str(tmp_path / "generated"))
+    monkeypatch.delenv("AUTODEV_PROJECT_ROOT", raising=False)
+    ctx = CodingContext(
+        project_id="project-1",
+        project_name="Demo",
+        task_breakdown={},
+    )
+
+    root = coding_providers._resolve_project_root(ctx=ctx)
+
+    assert root == (tmp_path / "generated" / "project-1").resolve()
+    assert root != coding_providers._platform_repo_root()
+
+
+def test_openspec_project_root_rejects_autodev_platform_repo():
+    ctx = CodingContext(
+        project_id="project-1",
+        project_name="Demo",
+        task_breakdown={},
+        project_workspace=str(coding_providers._platform_repo_root() / "tmp-generated-project"),
+    )
+
+    with pytest.raises(RuntimeError, match="不能位于 AutoDev 平台仓库内"):
+        coding_providers._resolve_project_root(ctx=ctx)
+
+
 @pytest.mark.anyio
 async def test_document_provider_node_uses_injected_provider():
     class FakeProvider:
-        async def run(self, *, ctx, cfg, tasks):
+        async def run(self, *, ctx, cfg, tasks, event_sink=None):
             return {
                 "coding_reply": "已按 OpenSpec apply 完成实现",
                 "deltas": ["openspec:task-1:archived"],
@@ -105,6 +133,78 @@ async def test_document_provider_node_uses_injected_provider():
     assert result["coding_reply"] == "已按 OpenSpec apply 完成实现"
     assert result["deltas"] == ["openspec:task-1:archived"]
     assert result["openspec_tasks"][0]["proposal_md"] == "# Proposal"
+
+
+@pytest.mark.anyio
+async def test_coding_graph_awaits_injected_document_provider(monkeypatch):
+    async def fake_planner_node(state):
+        return {"coding_plan": [{"id": "task-1", "title": "账号登录"}]}
+
+    async def fake_synthesizer_node(state):
+        return {
+            "structured": {
+                "summary": "完成",
+                "code_files": [],
+            }
+        }
+
+    class FakeProvider:
+        async def run(self, *, ctx, cfg, tasks, event_sink=None):
+            if event_sink is not None:
+                event_sink("coding: 正在使用 OpenSpec 模式执行实现：账号登录")
+            return {
+                "coding_reply": "已完成账号登录实现",
+                "deltas": ["coding: 正在使用 OpenSpec 模式执行实现：账号登录"],
+                "openspec_tasks": [],
+            }
+
+    monkeypatch.setattr(coding_module, "planner_node", fake_planner_node)
+    monkeypatch.setattr(coding_module, "synthesizer_node", fake_synthesizer_node)
+
+    graph = coding_module.build_coding_graph(provider=FakeProvider())
+    result = await graph.ainvoke(
+        {
+            "context": CodingContext(
+                project_id="project-1",
+                project_name="Demo",
+                task_breakdown={"prd": {"summary": "PRD"}},
+            ),
+            "config": ModelConfig(api_key="test", base_url="http://example.test", model="test"),
+            "deltas": [],
+            "structured": {},
+            "error": None,
+        }
+    )
+
+    assert result["result"].summary == "完成"
+    assert result["coding_reply"] == "已完成账号登录实现"
+    assert result["deltas"] == ["coding: 正在使用 OpenSpec 模式执行实现：账号登录"]
+
+    custom_events = []
+    async for mode, chunk in graph.astream(
+        {
+            "context": CodingContext(
+                project_id="project-1",
+                project_name="Demo",
+                task_breakdown={"prd": {"summary": "PRD"}},
+            ),
+            "config": ModelConfig(api_key="test", base_url="http://example.test", model="test"),
+            "deltas": [],
+            "structured": {},
+            "error": None,
+        },
+        stream_mode=["custom", "updates"],
+    ):
+        if mode == "custom":
+            custom_events.append(chunk)
+
+    assert custom_events == [
+        {
+            "type": "workflow_log",
+            "stage": "coding",
+            "detail": "coding: 正在使用 OpenSpec 模式执行实现：账号登录",
+        }
+    ]
 
 
 @pytest.mark.anyio

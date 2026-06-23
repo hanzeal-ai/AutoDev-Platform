@@ -34,15 +34,15 @@ pub(super) fn dispatch(
         protocol::MESSAGE_COMMAND_ADD_CREATION_MATERIALS => {
             Some(materials::handle_add_materials(inbound, runtime_paths))
         }
-        protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW => Some(
-            run_project_workflow::handle_run(inbound, runtime_paths),
-        ),
-        protocol::MESSAGE_COMMAND_START_PROJECT_WORKFLOW => Some(
-            run_project_workflow::handle_start(inbound, runtime_paths),
-        ),
-        protocol::MESSAGE_COMMAND_RESUME_PROJECT_WORKFLOW => Some(
-            run_project_workflow::handle_resume(inbound, runtime_paths),
-        ),
+        protocol::MESSAGE_COMMAND_RUN_PROJECT_WORKFLOW => {
+            Some(run_project_workflow::handle_run(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_START_PROJECT_WORKFLOW => {
+            Some(run_project_workflow::handle_start(inbound, runtime_paths))
+        }
+        protocol::MESSAGE_COMMAND_RESUME_PROJECT_WORKFLOW => {
+            Some(run_project_workflow::handle_resume(inbound, runtime_paths))
+        }
         protocol::MESSAGE_COMMAND_DELETE_PROJECT => {
             Some(delete_project::handle_delete(inbound, runtime_paths))
         }
@@ -58,6 +58,22 @@ pub(super) fn dispatch_streaming_add_message(
     schema_version: u32,
 ) {
     creation_messages::handle_add_message_streaming(
+        inbound,
+        runtime_paths,
+        writer,
+        correlation_id,
+        schema_version,
+    );
+}
+
+pub(super) fn dispatch_streaming_project_workflow(
+    inbound: &protocol::EnvelopeIn,
+    runtime_paths: &runtime::RuntimePaths,
+    writer: &mut dyn Write,
+    correlation_id: &str,
+    schema_version: u32,
+) {
+    run_project_workflow::handle_run_streaming(
         inbound,
         runtime_paths,
         writer,

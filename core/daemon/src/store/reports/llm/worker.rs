@@ -3,6 +3,7 @@
 //! Delegates all AI generation to the Python AI Worker (LangGraph).
 
 use serde_json::{json, Value};
+use std::io::{BufRead, BufReader};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -70,7 +71,10 @@ pub(crate) fn request_workflow_events(workflow_id: &str) -> StoreResult<Value> {
     )
 }
 
-pub(crate) fn request_workflow_resume(workflow_id: &str, action: Option<&str>) -> StoreResult<Value> {
+pub(crate) fn request_workflow_resume(
+    workflow_id: &str,
+    action: Option<&str>,
+) -> StoreResult<Value> {
     let mut body = json!({ "workflow_id": workflow_id });
     if let Some(action) = action.filter(|value| !value.is_empty()) {
         body["action"] = json!(action);
@@ -95,6 +99,48 @@ pub(crate) fn request_workflow_start(
         Duration::from_secs(900),
         "workflow start",
     )
+}
+
+pub(crate) fn request_workflow_stream<F>(
+    project_id: &str,
+    project_name: &str,
+    feasibility: Option<&Value>,
+    action: Option<&str>,
+    mode: &str,
+    mut on_event: F,
+) -> StoreResult<Value>
+where
+    F: FnMut(Value) -> StoreResult<()>,
+{
+    let mut body = workflow_start_body(project_id, project_name, feasibility, action);
+    body["mode"] = json!(mode);
+    let url = format!("{}/workflow/stream", worker_base_url());
+    let agent = make_agent(Duration::from_secs(900));
+    let response = agent
+        .post(&url)
+        .set("Content-Type", "application/json")
+        .set("Accept", "application/x-ndjson")
+        .send_json(body)
+        .map_err(|err| format!("AI Worker workflow stream 请求失败: {err}"))?;
+    let reader = BufReader::new(response.into_reader());
+    let mut final_status = Value::Null;
+    for line in reader.lines() {
+        let line = line.map_err(|err| format!("读取 AI Worker workflow stream 响应失败: {err}"))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let event: Value = serde_json::from_str(&line)
+            .map_err(|err| format!("解析 AI Worker workflow stream JSON 失败: {err}"))?;
+        if let Some(status) = event.get("status").cloned() {
+            final_status = status;
+        }
+        on_event(event)?;
+    }
+    if final_status.is_null() {
+        request_workflow_status(project_id)
+    } else {
+        Ok(final_status)
+    }
 }
 
 pub(crate) fn request_workflow_artifact(

@@ -31,6 +31,7 @@ struct ShellViewState {
     var stageBlueprints: [DeliveryLifecycleStage: StageViewBlueprint]
     var executionDetails: [ProjectExecutionDetailKey: DeliveryExecutionDetail]
     var workflowSnapshots: [UUID: DeliveryWorkflowSnapshot]
+    var workflowRawStreamLines: [UUID: [String]]
     var opsSnapshot: DeliveryOpsSnapshot
     var userProfile: UserProfileSummary
     var isAuthenticated: Bool

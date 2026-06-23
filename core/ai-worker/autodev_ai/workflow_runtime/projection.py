@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -58,6 +59,7 @@ def build_workflow_events(state: Mapping[str, Any]) -> dict[str, Any]:
     status = build_workflow_status(state)
     workflow_id = str(status.get("workflow_id") or "").strip()
     events: list[dict[str, Any]] = []
+    created_at_ms = _now_ms()
 
     for sequence, (stage, phase) in enumerate(status["phases"].items(), start=1):
         phase_status = str(phase.get("status") or "pending")
@@ -71,6 +73,7 @@ def build_workflow_events(state: Mapping[str, Any]) -> dict[str, Any]:
                 "detail": _phase_event_detail(stage, phase_status, state),
                 "status": phase_status,
                 "artifact_id": phase.get("artifact_id"),
+                "created_at_ms": created_at_ms,
             }
         )
 
@@ -89,6 +92,7 @@ def build_workflow_events(state: Mapping[str, Any]) -> dict[str, Any]:
                 "detail": detail[:2048],
                 "status": _workflow_log_status(detail),
                 "artifact_id": None,
+                "created_at_ms": created_at_ms,
             }
         )
         sequence += 1
@@ -288,7 +292,7 @@ def _review_reason(review: Any, fallback: str) -> str:
 
 
 def _workflow_log_status(detail: str) -> str:
-    if "准备执行" in detail:
+    if "准备执行" in detail or "正在" in detail:
         return "running"
     if "正在使用 OpenSpec" in detail or "正在初始化 OpenSpec" in detail:
         return "running"
@@ -299,6 +303,10 @@ def _workflow_log_status(detail: str) -> str:
     if "补充" in detail:
         return "awaiting_user_input"
     return "completed"
+
+
+def _now_ms() -> int:
+    return int(time.time() * 1000)
 
 
 def _event_stage(detail: str, fallback: str) -> str:

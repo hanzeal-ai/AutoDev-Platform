@@ -59,6 +59,12 @@ extension DaemonClient {
         return payload
     }
 
+    static func runProjectWorkflowStreamPayload(projectID: String, feedback: String?, action: String?, mode: String) -> [String: Any] {
+        var payload = runProjectWorkflowPayload(projectID: projectID, feedback: feedback, action: action)
+        payload["mode"] = mode
+        return payload
+    }
+
     static func encodeRequestBody(messageType: String, payload: [String: Any]) throws -> Data {
         let request = IPCRequestEnvelope.make(messageType: messageType, payload: payload)
         return try JSONSerialization.data(withJSONObject: request.jsonObject(), options: [])

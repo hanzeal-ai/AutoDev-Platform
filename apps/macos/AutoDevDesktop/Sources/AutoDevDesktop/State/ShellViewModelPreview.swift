@@ -102,6 +102,15 @@ private struct PreviewDaemonClient: DaemonQuerying {
         throw DaemonClientError.malformedResponse
     }
 
+    func runProjectWorkflowStreaming(projectID _: String, feedback _: String?, action _: String?, mode _: String) -> WorkflowStreamingHandle {
+        let handle = WorkflowStreamingHandle()
+        handle.stream = AsyncStream { continuation in
+            continuation.yield(.done(nil, nil))
+            continuation.finish()
+        }
+        return handle
+    }
+
     func startProjectWorkflow(projectID _: String, feedback _: String?, action _: String?) async throws -> DaemonCommandResult {
         throw DaemonClientError.malformedResponse
     }

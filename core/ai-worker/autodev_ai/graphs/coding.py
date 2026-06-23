@@ -13,6 +13,7 @@ import logging
 from typing import TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.config import get_stream_writer
 from langgraph.graph import StateGraph, START, END
 
 from ..config import ModelConfig
@@ -89,10 +90,12 @@ async def document_provider_node(
     cfg = state["config"]
 
     selected_provider = provider or provider_from_env()
+    event_sink = _coding_stream_event_sink()
     result = await selected_provider.run(
         ctx=ctx,
         cfg=cfg,
         tasks=state.get("coding_plan", []),
+        event_sink=event_sink,
     )
     full_reply = str(result.get("coding_reply") or "")
 
@@ -109,6 +112,24 @@ async def document_provider_node(
         "deltas": result.get("deltas", []),
         "openspec_tasks": result.get("openspec_tasks", []),
     }
+
+
+def _coding_stream_event_sink():
+    try:
+        writer = get_stream_writer()
+    except RuntimeError:
+        return None
+
+    def sink(detail: str) -> None:
+        writer(
+            {
+                "type": "workflow_log",
+                "stage": "coding",
+                "detail": detail,
+            }
+        )
+
+    return sink
 
 
 async def coding_agent_node(state: CodingState) -> dict:
@@ -191,9 +212,12 @@ async def normalizer_node(state: CodingState) -> dict:
 
 
 def build_coding_graph(provider: CodingProvider | None = None) -> StateGraph:
+    async def document_provider_graph_node(state: CodingState) -> dict:
+        return await document_provider_node(state, provider)
+
     graph = StateGraph(CodingState)
     graph.add_node("planner", planner_node)
-    graph.add_node("document_provider", lambda state: document_provider_node(state, provider))
+    graph.add_node("document_provider", document_provider_graph_node)
     graph.add_node("synthesizer", synthesizer_node)
     graph.add_node("normalizer", normalizer_node)
 

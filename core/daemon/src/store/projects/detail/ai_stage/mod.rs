@@ -32,6 +32,87 @@ pub(super) fn generate_stage_ai_content(
     )
 }
 
+pub(super) fn generate_stage_ai_content_streaming<F>(
+    store: &Store,
+    run_id: &str,
+    project_id: &str,
+    project_name: &str,
+    stage: &str,
+    feasibility: Option<&Value>,
+    action: Option<&str>,
+    mode: &str,
+    mut on_event: F,
+) -> StoreResult<bool>
+where
+    F: FnMut(Value) -> StoreResult<()>,
+{
+    insert_stage_event(
+        store,
+        project_id,
+        stage,
+        "系统：启动统一 Workflow 流",
+        "正在通过 workflow stream 返回节点状态、过程事件与产物索引。",
+    )?;
+    upsert_ai_run(
+        store,
+        run_id,
+        project_id,
+        stage,
+        "waiting_first_delta",
+        None,
+    )?;
+
+    let workflow_id = project_id;
+    let workflow_status = match worker::request_workflow_stream(
+        project_id,
+        project_name,
+        feasibility,
+        action,
+        mode,
+        |event| {
+            if let Some(status) = event.get("status") {
+                let _ = update_project_from_workflow_status(store, project_id, status);
+                let _ = persist_workflow_outputs(store, project_id, workflow_id, status);
+                let workflow_run_status = status
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .unwrap_or("streaming");
+                let _ = upsert_ai_run(store, run_id, project_id, stage, workflow_run_status, None);
+            }
+            on_event(event)
+        },
+    ) {
+        Ok(value) => value,
+        Err(reason) => {
+            if let Ok(partial_status) = worker::request_workflow_status(workflow_id) {
+                let _ = update_project_from_workflow_status(store, project_id, &partial_status);
+                let _ = persist_workflow_outputs(store, project_id, workflow_id, &partial_status);
+            }
+            upsert_ai_run(store, run_id, project_id, stage, "failed", Some(&reason))?;
+            insert_stage_event(
+                store,
+                project_id,
+                stage,
+                "统一 Workflow 流执行失败",
+                &format!("AI Worker stream 请求失败：{}", reason),
+            )?;
+            logger::error_fields(
+                "ai_worker workflow stream failed",
+                &[
+                    ("project_id", project_id.to_string()),
+                    ("stage", stage.to_string()),
+                    ("reason", reason),
+                ],
+            );
+            return Ok(false);
+        }
+    };
+
+    update_project_from_workflow_status(store, project_id, &workflow_status)?;
+    persist_workflow_outputs(store, project_id, workflow_id, &workflow_status)?;
+    finish_workflow_run_from_status(store, run_id, project_id, stage, &workflow_status)
+}
+
 pub(super) fn create_stage_ai_run(
     store: &Store,
     project_id: &str,
@@ -53,7 +134,15 @@ fn request_and_persist_stage_ai_content(
     _feedback: Option<&str>,
     action: Option<&str>,
 ) -> StoreResult<bool> {
-    request_via_workflow(store, run_id, project_id, project_name, stage, feasibility, action)
+    request_via_workflow(
+        store,
+        run_id,
+        project_id,
+        project_name,
+        stage,
+        feasibility,
+        action,
+    )
 }
 
 fn request_via_workflow(
@@ -123,6 +212,16 @@ fn request_via_workflow(
 
     update_project_from_workflow_status(store, project_id, &workflow_status)?;
     persist_workflow_outputs(store, project_id, workflow_id, &workflow_status)?;
+    finish_workflow_run_from_status(store, run_id, project_id, stage, &workflow_status)
+}
+
+fn finish_workflow_run_from_status(
+    store: &Store,
+    run_id: &str,
+    project_id: &str,
+    stage: &str,
+    workflow_status: &Value,
+) -> StoreResult<bool> {
     let workflow_run_status = workflow_status
         .get("status")
         .and_then(Value::as_str)
@@ -147,7 +246,14 @@ fn request_via_workflow(
                 "统一 Workflow 等待补充信息",
                 "当前阶段判断现有信息不足，补充信息后可继续执行。",
             )?;
-            upsert_ai_run(store, run_id, project_id, stage, "awaiting_user_input", None)?;
+            upsert_ai_run(
+                store,
+                run_id,
+                project_id,
+                stage,
+                "awaiting_user_input",
+                None,
+            )?;
             Ok(false)
         }
         "failed" | "blocked" => {
@@ -156,7 +262,14 @@ fn request_via_workflow(
                 .and_then(Value::as_str)
                 .unwrap_or("Workflow 未完成");
             insert_stage_event(store, project_id, stage, "统一 Workflow 未完成", reason)?;
-            upsert_ai_run(store, run_id, project_id, stage, workflow_run_status, Some(reason))?;
+            upsert_ai_run(
+                store,
+                run_id,
+                project_id,
+                stage,
+                workflow_run_status,
+                Some(reason),
+            )?;
             Ok(false)
         }
         _ => {
@@ -272,11 +385,7 @@ fn persist_workflow_outputs(
     Ok(())
 }
 
-fn persist_workflow_artifact(
-    store: &Store,
-    project_id: &str,
-    artifact: &Value,
-) -> StoreResult<()> {
+fn persist_workflow_artifact(store: &Store, project_id: &str, artifact: &Value) -> StoreResult<()> {
     let stage = artifact.get("stage").and_then(Value::as_str).unwrap_or("");
     let name = artifact
         .get("name")

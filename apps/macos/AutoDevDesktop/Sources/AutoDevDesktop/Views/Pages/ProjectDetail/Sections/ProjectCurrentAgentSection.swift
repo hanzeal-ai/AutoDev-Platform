@@ -63,9 +63,11 @@ struct ProjectCurrentAgentSection: View {
             AgentNoticeLine(systemImage: activity == .idleSuspected ? "exclamationmark.circle.fill" : "hourglass", title: WorkflowActivityPresentation.label(for: activity), detail: activityDetail)
             executionEvents
         } else if snapshot.currentStep == "coding", !fileNames.isEmpty {
+            liveActionSummary
             fileSummary
             executionEvents
         } else {
+            liveActionSummary
             stageSummary
             executionEvents
             stepList
@@ -101,6 +103,13 @@ struct ProjectCurrentAgentSection: View {
             AgentNoticeLine(systemImage: "text.alignleft", title: "阶段摘要", detail: detail.objective)
         } else {
             AgentNoticeLine(systemImage: "sparkles", title: "执行状态", detail: latestDetail(fallback: "等待当前 Agent 输出。"))
+        }
+    }
+
+    @ViewBuilder
+    private var liveActionSummary: some View {
+        if snapshot?.status == .running, let detail = currentActionDetail {
+            AgentNoticeLine(systemImage: "sparkles", title: "当前动作", detail: detail)
         }
     }
 
@@ -215,6 +224,13 @@ struct ProjectCurrentAgentSection: View {
         currentEvents.last?.detail ?? fallback
     }
 
+    private var currentActionDetail: String? {
+        guard let detail = currentEvents.last?.detail.trimmingCharacters(in: .whitespacesAndNewlines),
+              !detail.isEmpty
+        else { return nil }
+        return detail
+    }
+
     private func stageTitle(for stage: String) -> String {
         ProjectWorkflowStatusPresentation.title(for: stage)
     }
@@ -265,10 +281,28 @@ private struct AgentTimelineRow: View {
                 .fill(ProjectWorkflowStatusPresentation.color(for: event.status))
                 .frame(width: 7, height: 7)
                 .padding(.top, 5)
-            Text(event.detail)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                if let timeLabel {
+                    Text(timeLabel)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary.opacity(0.75))
+                }
+                Text(event.detail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
+
+    private var timeLabel: String? {
+        guard let createdAtMS = event.createdAtMS else { return nil }
+        return Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(createdAtMS) / 1000))
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
 }

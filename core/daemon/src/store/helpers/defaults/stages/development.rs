@@ -5,7 +5,8 @@ use serde_json::json;
 
 pub(in crate::store::helpers::defaults) fn development() -> StageDefaults {
     StageDefaults {
-        objective: "完成前后端需求分析、任务拆分、Git/GitHub 协作、编码审查循环、稳定预览与交付归档",
+        objective:
+            "完成前后端需求分析、任务拆分、Git/GitHub 协作、编码审查循环、稳定预览与交付归档",
         input_contexts: vec![
             "前端需求分析：页面清单、路由表、组件拆分、状态依赖、API 依赖、frontend-tasks.md",
             "后端需求分析：接口契约、数据模型、模块拆分、错误码、部署配置、backend-tasks.md",
@@ -25,7 +26,12 @@ pub(in crate::store::helpers::defaults) fn development() -> StageDefaults {
             {"title":"preview 稳定预览发布", "status":"queued"},
             {"title":"交付归档", "status":"queued"}
         ]),
-        risk_items: vec!["接口契约未冻结会导致前后端返工", "develop 未验证直接预览会破坏用户稳定访问", "Code Review 修复未闭环会积累缺陷", "GitHub 仓库同步失败会影响源代码归档"],
+        risk_items: vec![
+            "接口契约未冻结会导致前后端返工",
+            "develop 未验证直接预览会破坏用户稳定访问",
+            "Code Review 修复未闭环会积累缺陷",
+            "GitHub 仓库同步失败会影响源代码归档",
+        ],
         event_flow: vec![
             "生成前后端需求分析",
             "拆分任务并冻结契约",

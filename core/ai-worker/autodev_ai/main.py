@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time as _time
 import traceback
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 
-from .config import ModelConfig, get_worker_port
+from .config import ModelConfig
 from .models import (
     WorkflowArtifactContext,
     WorkflowResumeContext,
     WorkflowStartContext,
+    WorkflowStreamContext,
 )
 from .workflow_runtime.service import (
     get_workflow_artifact,
@@ -20,6 +23,7 @@ from .workflow_runtime.service import (
     get_workflow_status,
     resume_workflow,
     start_workflow,
+    stream_workflow,
 )
 
 # ── Logging setup ──────────────────────────────────────────────────────────────
@@ -71,6 +75,43 @@ async def workflow_resume(ctx: WorkflowResumeContext):
     except Exception:
         logger.error("Workflow resume failed: %s", traceback.format_exc())
         raise HTTPException(status_code=500, detail="Workflow 恢复失败，请重试")
+
+
+@app.post("/workflow/stream")
+async def workflow_stream(ctx: WorkflowStreamContext):
+    """Stream checkpointed workflow execution events as NDJSON."""
+
+    async def lines():
+        try:
+            async for event in stream_workflow(ctx):
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except RuntimeError:
+            yield (
+                json.dumps(
+                    {
+                        "type": "workflow_error",
+                        "workflow_id": ctx.workflow_id or ctx.thread_id,
+                        "detail": "AI 服务不可用",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+        except Exception:
+            logger.error("Workflow stream failed: %s", traceback.format_exc())
+            yield (
+                json.dumps(
+                    {
+                        "type": "workflow_error",
+                        "workflow_id": ctx.workflow_id or ctx.thread_id,
+                        "detail": "Workflow 流执行失败，请重试",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
 @app.post("/workflow/status")

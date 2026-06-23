@@ -16,7 +16,9 @@ fn log(level: &str, message: &str, fields: &[(&str, String)]) {
 }
 
 fn timestamp() -> String {
-    Local::now().format("[%Y-%m-%d %H:%M:%S%.3f %:z]").to_string()
+    Local::now()
+        .format("[%Y-%m-%d %H:%M:%S%.3f %:z]")
+        .to_string()
 }
 
 fn sanitize(value: &str) -> String {

@@ -30,6 +30,7 @@ from .workflow_runtime.service import (
     get_workflow_status,
     resume_workflow,
     start_workflow,
+    stream_workflow,
     workflow_config,
 )
 from .workflow_runtime.types import AutoDevWorkflowState, NodeName, WorkflowNode
@@ -56,6 +57,7 @@ __all__ = [
     "report_node",
     "resume_workflow",
     "start_workflow",
+    "stream_workflow",
     "summary_node",
     "workflow_config",
 ]

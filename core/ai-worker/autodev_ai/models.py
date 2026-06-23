@@ -314,6 +314,7 @@ class CodingContext(BaseModel):
     project_id: str
     project_name: str = Field(max_length=256)
     task_breakdown: dict  # The DevelopmentPlan output from sub-step 1
+    project_workspace: str = Field(default="", max_length=2048)
 
     @field_validator("project_id")
     @classmethod
@@ -428,4 +429,18 @@ class WorkflowArtifactContext(WorkflowResumeContext):
         v = v.strip()
         if not v or not re.match(r"^[a-zA-Z0-9_:-]{1,256}$", v):
             raise ValueError("invalid artifact_id")
+        return v
+
+
+class WorkflowStreamContext(WorkflowStartContext):
+    """Request body for streaming workflow execution events."""
+
+    mode: str = Field(default="resume", max_length=16)
+
+    @field_validator("mode")
+    @classmethod
+    def validate_workflow_stream_mode(cls, v: str) -> str:
+        v = v.strip().lower() or "resume"
+        if v not in {"start", "resume"}:
+            raise ValueError("invalid workflow stream mode")
         return v

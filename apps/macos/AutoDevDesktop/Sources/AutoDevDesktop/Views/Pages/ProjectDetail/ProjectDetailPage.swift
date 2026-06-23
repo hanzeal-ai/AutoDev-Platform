@@ -25,6 +25,10 @@ struct ProjectDetailPage: View {
                         detail: detail,
                         projectName: project.title
                     )
+
+                    ProjectWorkflowRawStreamSection(
+                        lines: viewModel.state.workflowRawStreamLines[project.id] ?? []
+                    )
                 }
             } else {
                 DashboardCard(title: "阶段详情") {
@@ -33,6 +37,32 @@ struct ProjectDetailPage: View {
                 }
             }
         }
+    }
+}
+
+private struct ProjectWorkflowRawStreamSection: View {
+    let lines: [String]
+
+    var body: some View {
+        DashboardCard(title: "流式接口原始返回") {
+            ScrollView([.vertical, .horizontal]) {
+                Text(rawText)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(10)
+            }
+            .frame(minHeight: 120, maxHeight: 240)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+    }
+
+    private var rawText: String {
+        if lines.isEmpty {
+            return "尚未收到 workflow stream 原始数据。"
+        }
+        return lines.joined(separator: "\n")
     }
 }
 

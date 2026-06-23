@@ -180,7 +180,8 @@ ON stage_ai_runs(project_id, stage, updated_at_ms DESC);
             }
         }
 
-        self.conn.execute(alter_sql, [])
+        self.conn
+            .execute(alter_sql, [])
             .map_err(|err| format!("alter table {}.{} failed: {}", table, column, err))?;
         Ok(())
     }

@@ -75,7 +75,8 @@ extension DomainMapper {
             title: event.title,
             detail: event.detail,
             status: workflowNodeStatus(from: event.status),
-            artifactID: event.artifactId
+            artifactID: event.artifactId,
+            createdAtMS: event.createdAtMs
         )
     }
 }

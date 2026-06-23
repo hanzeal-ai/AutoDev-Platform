@@ -162,7 +162,8 @@ final class DomainMapperTests: XCTestCase {
                     title: "过程事件",
                     detail: "tool:file_search",
                     status: "completed",
-                    artifactId: nil
+                    artifactId: nil,
+                    createdAtMs: 1_719_000_000_000
                 )
             ]
         )
@@ -177,6 +178,7 @@ final class DomainMapperTests: XCTestCase {
         XCTAssertEqual(snapshot.artifacts.first?.stage, "coding")
         XCTAssertEqual(snapshot.artifacts.first?.fileName, "coding.json")
         XCTAssertEqual(snapshot.events.first?.detail, "tool:file_search")
+        XCTAssertEqual(snapshot.events.first?.createdAtMS, 1_719_000_000_000)
     }
 
     func testWorkflowSnapshotMapsEveryVisibleStageAndStatus() {

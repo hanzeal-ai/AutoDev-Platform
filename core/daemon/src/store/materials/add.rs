@@ -20,14 +20,19 @@ pub(super) fn add_creation_materials(
 
         // Path traversal guard
         if item.path.contains("..") {
-            return Err(format!("material path must not contain '..': {}", item.path));
+            return Err(format!(
+                "material path must not contain '..': {}",
+                item.path
+            ));
         }
 
         // File size limit (100 MB)
         const MAX_MATERIAL_SIZE: u64 = 100 * 1024 * 1024;
         if source.exists() {
             let file_size = std::fs::metadata(&source)
-                .map_err(|err| format!("failed to read metadata for {}: {}", source.display(), err))?
+                .map_err(|err| {
+                    format!("failed to read metadata for {}: {}", source.display(), err)
+                })?
                 .len();
             if file_size > MAX_MATERIAL_SIZE {
                 return Err(format!(
@@ -83,8 +88,14 @@ fn material_dest(store: &Store, material_id: &str, name: &str) -> PathBuf {
 
 fn copy_or_stub_material(source: &Path, dest: &Path) -> StoreResult<(String, String)> {
     if source.exists() {
-        fs::copy(source, dest)
-            .map_err(|err| format!("fs::copy {} -> {}: {}", source.display(), dest.display(), err))?;
+        fs::copy(source, dest).map_err(|err| {
+            format!(
+                "fs::copy {} -> {}: {}",
+                source.display(),
+                dest.display(),
+                err
+            )
+        })?;
         match fs::metadata(dest) {
             Ok(meta) => Ok((human_file_size(meta.len()), "completed".to_string())),
             Err(err) => {

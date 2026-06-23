@@ -46,7 +46,9 @@ pub(crate) fn persist_development_task_breakdown(
             let safe_path = path
                 .replace("..", "")
                 .replace('\0', "")
-                .trim_start_matches('/').trim_start_matches('\\').to_string();
+                .trim_start_matches('/')
+                .trim_start_matches('\\')
+                .to_string();
 
             let full_path = scaffold_dir.join(&safe_path);
             if let Err(err) = ensure_parent_dir(&full_path) {
@@ -68,8 +70,7 @@ pub(crate) fn persist_development_task_breakdown(
     // 3. Write dev-plan.md (human-readable)
     let md_path = artifact_dir.join("dev-plan.md");
     let markdown = render_dev_markdown(content);
-    fs::write(&md_path, &markdown)
-        .map_err(|err| format!("写入 dev-plan.md 失败: {err}"))?;
+    fs::write(&md_path, &markdown).map_err(|err| format!("写入 dev-plan.md 失败: {err}"))?;
 
     // 4. Upsert stage_artifacts — structured JSON
     let json_artifact_id = Uuid::new_v4().to_string();
@@ -98,25 +99,38 @@ pub(crate) fn persist_development_task_breakdown(
     ).map_err(|err| err.to_string())?;
 
     // 6. Upsert project_stages row — format for display pipeline
-    let arch_summary = content.get("architecture_summary").and_then(Value::as_str).unwrap_or("研发方案已生成");
+    let arch_summary = content
+        .get("architecture_summary")
+        .and_then(Value::as_str)
+        .unwrap_or("研发方案已生成");
 
     // input_contexts: tech_stack as labeled strings
     let mut tech_lines: Vec<String> = Vec::new();
     if let Some(ts) = content.get("tech_stack") {
         if let Some(lang) = ts.get("language").and_then(Value::as_str) {
-            if !lang.is_empty() { tech_lines.push(format!("语言：{}", lang)); }
+            if !lang.is_empty() {
+                tech_lines.push(format!("语言：{}", lang));
+            }
         }
         if let Some(fw) = ts.get("framework").and_then(Value::as_str) {
-            if !fw.is_empty() { tech_lines.push(format!("框架：{}", fw)); }
+            if !fw.is_empty() {
+                tech_lines.push(format!("框架：{}", fw));
+            }
         }
         if let Some(bt) = ts.get("build_tool").and_then(Value::as_str) {
-            if !bt.is_empty() { tech_lines.push(format!("构建工具：{}", bt)); }
+            if !bt.is_empty() {
+                tech_lines.push(format!("构建工具：{}", bt));
+            }
         }
         if let Some(pm) = ts.get("package_manager").and_then(Value::as_str) {
-            if !pm.is_empty() { tech_lines.push(format!("包管理器：{}", pm)); }
+            if !pm.is_empty() {
+                tech_lines.push(format!("包管理器：{}", pm));
+            }
         }
         if let Some(rt) = ts.get("runtime").and_then(Value::as_str) {
-            if !rt.is_empty() { tech_lines.push(format!("运行时：{}", rt)); }
+            if !rt.is_empty() {
+                tech_lines.push(format!("运行时：{}", rt));
+            }
         }
         if let Some(additional) = ts.get("additional").and_then(Value::as_array) {
             for a in additional.iter().filter_map(Value::as_str) {
@@ -131,16 +145,22 @@ pub(crate) fn persist_development_task_breakdown(
         .get("modules")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().map(|m| {
-                let name = m.get("name").and_then(Value::as_str).unwrap_or("-");
-                let resp = m.get("responsibility").and_then(Value::as_str).unwrap_or("");
-                let title = if resp.is_empty() {
-                    name.to_string()
-                } else {
-                    format!("{} — {}", name, resp)
-                };
-                json!({"title": title, "status": "queued"})
-            }).collect()
+            items
+                .iter()
+                .map(|m| {
+                    let name = m.get("name").and_then(Value::as_str).unwrap_or("-");
+                    let resp = m
+                        .get("responsibility")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    let title = if resp.is_empty() {
+                        name.to_string()
+                    } else {
+                        format!("{} — {}", name, resp)
+                    };
+                    json!({"title": title, "status": "queued"})
+                })
+                .collect()
         })
         .unwrap_or_default();
     let modules_display_json = to_json_string(&module_steps);
@@ -150,16 +170,19 @@ pub(crate) fn persist_development_task_breakdown(
         .get("api_contracts")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().map(|api| {
-                let method = api.get("method").and_then(Value::as_str).unwrap_or("GET");
-                let path = api.get("path").and_then(Value::as_str).unwrap_or("-");
-                let desc = api.get("description").and_then(Value::as_str).unwrap_or("");
-                if desc.is_empty() {
-                    format!("{} {}", method, path)
-                } else {
-                    format!("{} {} — {}", method, path, desc)
-                }
-            }).collect()
+            items
+                .iter()
+                .map(|api| {
+                    let method = api.get("method").and_then(Value::as_str).unwrap_or("GET");
+                    let path = api.get("path").and_then(Value::as_str).unwrap_or("-");
+                    let desc = api.get("description").and_then(Value::as_str).unwrap_or("");
+                    if desc.is_empty() {
+                        format!("{} {}", method, path)
+                    } else {
+                        format!("{} {} — {}", method, path, desc)
+                    }
+                })
+                .collect()
         })
         .unwrap_or_default();
     let apis_display_json = to_json_string(&api_lines);
@@ -169,26 +192,30 @@ pub(crate) fn persist_development_task_breakdown(
         .get("scaffold_files")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().enumerate().map(|(i, sf)| {
-                let path = sf.get("path").and_then(Value::as_str).unwrap_or("-");
-                let purpose = sf.get("purpose").and_then(Value::as_str).unwrap_or("");
-                let lang = sf.get("language").and_then(Value::as_str).unwrap_or("");
-                let agent_role = if lang.is_empty() {
-                    "脚手架".to_string()
-                } else {
-                    format!("脚手架 ({})", lang)
-                };
-                json!({
-                    "id": format!("scaffold-{}", i),
-                    "title": path,
-                    "agent_role": agent_role,
-                    "status": "completed",
-                    "progress": 1.0,
-                    "depends_on": [],
-                    "current_output": purpose,
-                    "next_step": ""
+            items
+                .iter()
+                .enumerate()
+                .map(|(i, sf)| {
+                    let path = sf.get("path").and_then(Value::as_str).unwrap_or("-");
+                    let purpose = sf.get("purpose").and_then(Value::as_str).unwrap_or("");
+                    let lang = sf.get("language").and_then(Value::as_str).unwrap_or("");
+                    let agent_role = if lang.is_empty() {
+                        "脚手架".to_string()
+                    } else {
+                        format!("脚手架 ({})", lang)
+                    };
+                    json!({
+                        "id": format!("scaffold-{}", i),
+                        "title": path,
+                        "agent_role": agent_role,
+                        "status": "completed",
+                        "progress": 1.0,
+                        "depends_on": [],
+                        "current_output": purpose,
+                        "next_step": ""
+                    })
                 })
-            }).collect()
+                .collect()
         })
         .unwrap_or_default();
     let scaffold_display_json = to_json_string(&scaffold_units);
@@ -214,8 +241,10 @@ pub(crate) fn persist_development_task_breakdown(
         }
     ]));
 
-    store.conn.execute(
-        r#"
+    store
+        .conn
+        .execute(
+            r#"
 INSERT INTO project_stages (
   project_id, stage, objective, input_contexts_json, step_progress_json,
   risk_items_json, event_flow_json, primary_action, secondary_actions_json,
@@ -233,20 +262,21 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
   work_units_json = excluded.work_units_json,
   updated_at_ms = excluded.updated_at_ms
 "#,
-        params![
-            project_id,
-            arch_summary,
-            &tech_display_json,     // tech_stack as strings
-            &modules_display_json,  // modules as [{title, status}]
-            &apis_display_json,     // api_contracts as strings
-            "[]",                   // event_flow
-            "任务拆分已完成",
-            "[]",                   // secondary_actions
-            &downloads_json,
-            &scaffold_display_json, // scaffold_files as work units
-            now,
-        ],
-    ).map_err(|err| err.to_string())?;
+            params![
+                project_id,
+                arch_summary,
+                &tech_display_json,    // tech_stack as strings
+                &modules_display_json, // modules as [{title, status}]
+                &apis_display_json,    // api_contracts as strings
+                "[]",                  // event_flow
+                "任务拆分已完成",
+                "[]", // secondary_actions
+                &downloads_json,
+                &scaffold_display_json, // scaffold_files as work units
+                now,
+            ],
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(())
 }
@@ -284,7 +314,12 @@ pub(crate) fn persist_development_coding(
                 continue;
             }
 
-            let safe_path = path.replace("..", "").replace('\0', "").trim_start_matches('/').trim_start_matches('\\').to_string();
+            let safe_path = path
+                .replace("..", "")
+                .replace('\0', "")
+                .trim_start_matches('/')
+                .trim_start_matches('\\')
+                .to_string();
             let full_path = artifact_dir.join(&safe_path);
             if let Err(err) = ensure_parent_dir(&full_path) {
                 crate::logger::error_fields(
@@ -327,8 +362,7 @@ pub(crate) fn persist_development_coding(
     let md_path = artifact_dir.join("coding-summary.md");
     ensure_parent_dir(&md_path)?;
     let markdown = render_coding_markdown(content);
-    fs::write(&md_path, &markdown)
-        .map_err(|err| format!("写入 coding-summary.md 失败: {err}"))?;
+    fs::write(&md_path, &markdown).map_err(|err| format!("写入 coding-summary.md 失败: {err}"))?;
 
     // 3. Upsert stage_artifacts — coding snapshot
     let md_artifact_id = Uuid::new_v4().to_string();
@@ -344,23 +378,29 @@ pub(crate) fn persist_development_coding(
     ).map_err(|err| err.to_string())?;
 
     // 4. Upsert project_stages row
-    let summary = content.get("summary").and_then(Value::as_str).unwrap_or("代码生成已完成");
+    let summary = content
+        .get("summary")
+        .and_then(Value::as_str)
+        .unwrap_or("代码生成已完成");
 
     // step_progress: modules/files as step items
     let step_items: Vec<Value> = content
         .get("code_files")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().map(|f| {
-                let path = f.get("path").and_then(Value::as_str).unwrap_or("-");
-                let module_id = f.get("module_id").and_then(Value::as_str).unwrap_or("");
-                let title = if module_id.is_empty() {
-                    path.to_string()
-                } else {
-                    format!("[{}] {}", module_id, path)
-                };
-                json!({"title": title, "status": "completed"})
-            }).collect()
+            items
+                .iter()
+                .map(|f| {
+                    let path = f.get("path").and_then(Value::as_str).unwrap_or("-");
+                    let module_id = f.get("module_id").and_then(Value::as_str).unwrap_or("");
+                    let title = if module_id.is_empty() {
+                        path.to_string()
+                    } else {
+                        format!("[{}] {}", module_id, path)
+                    };
+                    json!({"title": title, "status": "completed"})
+                })
+                .collect()
         })
         .unwrap_or_default();
     let step_progress_json = to_json_string(&step_items);
@@ -377,8 +417,10 @@ pub(crate) fn persist_development_coding(
 
     let code_units_json = to_json_string(&code_units);
 
-    store.conn.execute(
-        r#"
+    store
+        .conn
+        .execute(
+            r#"
 INSERT INTO project_stages (
   project_id, stage, objective, input_contexts_json, step_progress_json,
   risk_items_json, event_flow_json, primary_action, secondary_actions_json,
@@ -396,20 +438,21 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
   work_units_json = excluded.work_units_json,
   updated_at_ms = excluded.updated_at_ms
 "#,
-        params![
-            project_id,
-            summary,
-            "[]",               // input_contexts
-            &step_progress_json, // code files as step items
-            "[]",               // risk_items
-            "[]",               // event_flow
-            "代码生成已完成",
-            "[]",               // secondary_actions
-            &downloads_json,
-            &code_units_json,   // code files as work units
-            now,
-        ],
-    ).map_err(|err| err.to_string())?;
+            params![
+                project_id,
+                summary,
+                "[]",                // input_contexts
+                &step_progress_json, // code files as step items
+                "[]",                // risk_items
+                "[]",                // event_flow
+                "代码生成已完成",
+                "[]", // secondary_actions
+                &downloads_json,
+                &code_units_json, // code files as work units
+                now,
+            ],
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(())
 }
@@ -462,16 +505,24 @@ fn render_dev_markdown(content: &Value) -> String {
             md.push_str(&format!("- 语言: {}\n", lang));
         }
         if let Some(fw) = ts.get("framework").and_then(Value::as_str) {
-            if !fw.is_empty() { md.push_str(&format!("- 框架: {}\n", fw)); }
+            if !fw.is_empty() {
+                md.push_str(&format!("- 框架: {}\n", fw));
+            }
         }
         if let Some(bt) = ts.get("build_tool").and_then(Value::as_str) {
-            if !bt.is_empty() { md.push_str(&format!("- 构建工具: {}\n", bt)); }
+            if !bt.is_empty() {
+                md.push_str(&format!("- 构建工具: {}\n", bt));
+            }
         }
         if let Some(pm) = ts.get("package_manager").and_then(Value::as_str) {
-            if !pm.is_empty() { md.push_str(&format!("- 包管理器: {}\n", pm)); }
+            if !pm.is_empty() {
+                md.push_str(&format!("- 包管理器: {}\n", pm));
+            }
         }
         if let Some(rt) = ts.get("runtime").and_then(Value::as_str) {
-            if !rt.is_empty() { md.push_str(&format!("- 运行时: {}\n", rt)); }
+            if !rt.is_empty() {
+                md.push_str(&format!("- 运行时: {}\n", rt));
+            }
         }
         md.push('\n');
     }
@@ -480,7 +531,10 @@ fn render_dev_markdown(content: &Value) -> String {
         md.push_str("## 模块设计\n\n");
         for m in modules {
             let name = m.get("name").and_then(Value::as_str).unwrap_or("-");
-            let resp = m.get("responsibility").and_then(Value::as_str).unwrap_or("");
+            let resp = m
+                .get("responsibility")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             md.push_str(&format!("### {}\n\n{}\n\n", name, resp));
             if let Some(files) = m.get("files").and_then(Value::as_array) {
                 md.push_str("文件:\n");

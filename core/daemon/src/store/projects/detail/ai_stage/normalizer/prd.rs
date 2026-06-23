@@ -30,14 +30,12 @@ pub(crate) fn persist_prd_content(
     ensure_parent_dir(&json_path)?;
     let json_content = serde_json::to_string_pretty(content)
         .map_err(|err| format!("PRD JSON 序列化失败: {err}"))?;
-    fs::write(&json_path, &json_content)
-        .map_err(|err| format!("写入 prd.json 失败: {err}"))?;
+    fs::write(&json_path, &json_content).map_err(|err| format!("写入 prd.json 失败: {err}"))?;
 
     // 2. Write prd.md (human-readable snapshot)
     let md_path = artifact_dir.join("prd.md");
     let markdown = render_prd_markdown(content);
-    fs::write(&md_path, &markdown)
-        .map_err(|err| format!("写入 prd.md 失败: {err}"))?;
+    fs::write(&md_path, &markdown).map_err(|err| format!("写入 prd.md 失败: {err}"))?;
 
     // 3. Upsert stage_artifacts — structured JSON
     let json_artifact_id = Uuid::new_v4().to_string();
@@ -66,7 +64,10 @@ pub(crate) fn persist_prd_content(
     ).map_err(|err| err.to_string())?;
 
     // 5. Upsert project_stages row — format for display pipeline
-    let summary = content.get("summary").and_then(Value::as_str).unwrap_or("PRD 已生成");
+    let summary = content
+        .get("summary")
+        .and_then(Value::as_str)
+        .unwrap_or("PRD 已生成");
 
     // input_contexts: goals + non_goals as labeled strings
     let mut display_contexts: Vec<String> = Vec::new();
@@ -87,35 +88,48 @@ pub(crate) fn persist_prd_content(
         .get("scope_items")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().map(|item| {
-                let priority = item.get("priority").and_then(Value::as_str).unwrap_or("P1");
-                let category = item.get("category").and_then(Value::as_str).unwrap_or("");
-                let name = item.get("name").and_then(Value::as_str).unwrap_or("-");
-                let desc = item.get("description").and_then(Value::as_str).unwrap_or("");
-                let title = if desc.is_empty() {
-                    format!("[{}/{}] {}", priority, category, name)
-                } else {
-                    format!("[{}/{}] {} — {}", priority, category, name, desc)
-                };
-                json!({"title": title, "status": "queued"})
-            }).collect()
+            items
+                .iter()
+                .map(|item| {
+                    let priority = item.get("priority").and_then(Value::as_str).unwrap_or("P1");
+                    let category = item.get("category").and_then(Value::as_str).unwrap_or("");
+                    let name = item.get("name").and_then(Value::as_str).unwrap_or("-");
+                    let desc = item
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    let title = if desc.is_empty() {
+                        format!("[{}/{}] {}", priority, category, name)
+                    } else {
+                        format!("[{}/{}] {} — {}", priority, category, name, desc)
+                    };
+                    json!({"title": title, "status": "queued"})
+                })
+                .collect()
         })
         .unwrap_or_default();
     let step_progress_json = to_json_string(&step_progress);
 
     // risk_items: technical_constraints as string array (already correct format)
-    let constraints_json = to_json_string(content.get("technical_constraints").unwrap_or(&json!([])));
+    let constraints_json =
+        to_json_string(content.get("technical_constraints").unwrap_or(&json!([])));
 
     // event_flow: acceptance_criteria as labeled strings
     let event_flow: Vec<String> = content
         .get("acceptance_criteria")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().map(|ac| {
-                let criticality = ac.get("criticality").and_then(Value::as_str).unwrap_or("must");
-                let statement = ac.get("statement").and_then(Value::as_str).unwrap_or("-");
-                format!("[{}] {}", criticality, statement)
-            }).collect()
+            items
+                .iter()
+                .map(|ac| {
+                    let criticality = ac
+                        .get("criticality")
+                        .and_then(Value::as_str)
+                        .unwrap_or("must");
+                    let statement = ac.get("statement").and_then(Value::as_str).unwrap_or("-");
+                    format!("[{}] {}", criticality, statement)
+                })
+                .collect()
         })
         .unwrap_or_default();
     let event_flow_json = to_json_string(&event_flow);
@@ -125,11 +139,21 @@ pub(crate) fn persist_prd_content(
         .get("milestones")
         .and_then(Value::as_array)
         .map(|items| {
-            items.iter().map(|ms| {
-                let title = ms.get("title").and_then(Value::as_str).unwrap_or("-");
-                let desc = ms.get("target_description").and_then(Value::as_str).unwrap_or("");
-                if desc.is_empty() { title.to_string() } else { format!("{} — {}", title, desc) }
-            }).collect()
+            items
+                .iter()
+                .map(|ms| {
+                    let title = ms.get("title").and_then(Value::as_str).unwrap_or("-");
+                    let desc = ms
+                        .get("target_description")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    if desc.is_empty() {
+                        title.to_string()
+                    } else {
+                        format!("{} — {}", title, desc)
+                    }
+                })
+                .collect()
         })
         .unwrap_or_default();
     let milestones_json = to_json_string(&milestones);
@@ -155,8 +179,10 @@ pub(crate) fn persist_prd_content(
         }
     ]));
 
-    store.conn.execute(
-        r#"
+    store
+        .conn
+        .execute(
+            r#"
 INSERT INTO project_stages (
   project_id, stage, objective, input_contexts_json, step_progress_json,
   risk_items_json, event_flow_json, primary_action, secondary_actions_json,
@@ -174,28 +200,31 @@ ON CONFLICT(project_id, stage) DO UPDATE SET
   work_units_json = excluded.work_units_json,
   updated_at_ms = excluded.updated_at_ms
 "#,
-        params![
-            project_id,
-            summary,
-            &input_contexts_json,  // goals + non_goals
-            &step_progress_json,   // scope_items as [{title, status}]
-            &constraints_json,     // technical_constraints
-            &event_flow_json,      // acceptance_criteria as strings
-            "PRD 已完成",
-            &milestones_json,       // milestones as strings
-            &downloads_json,
-            "[]",                  // work_units — empty for PRD
-            now,
-        ],
-    ).map_err(|err| err.to_string())?;
+            params![
+                project_id,
+                summary,
+                &input_contexts_json, // goals + non_goals
+                &step_progress_json,  // scope_items as [{title, status}]
+                &constraints_json,    // technical_constraints
+                &event_flow_json,     // acceptance_criteria as strings
+                "PRD 已完成",
+                &milestones_json, // milestones as strings
+                &downloads_json,
+                "[]", // work_units — empty for PRD
+                now,
+            ],
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(())
 }
 
-
 fn render_prd_markdown(content: &Value) -> String {
     let mut md = String::new();
-    let name = content.get("project_name").and_then(Value::as_str).unwrap_or("项目");
+    let name = content
+        .get("project_name")
+        .and_then(Value::as_str)
+        .unwrap_or("项目");
     md.push_str(&format!("# {} — PRD\n\n", name));
 
     if let Some(summary) = content.get("summary").and_then(Value::as_str) {
@@ -227,13 +256,22 @@ fn render_prd_markdown(content: &Value) -> String {
             let name = item.get("name").and_then(Value::as_str).unwrap_or("-");
             let priority = item.get("priority").and_then(Value::as_str).unwrap_or("P1");
             let category = item.get("category").and_then(Value::as_str).unwrap_or("-");
-            let desc = item.get("description").and_then(Value::as_str).unwrap_or("");
-            md.push_str(&format!("| {} | {} | {} | {} | {} |\n", id, name, priority, category, desc));
+            let desc = item
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            md.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                id, name, priority, category, desc
+            ));
         }
         md.push('\n');
     }
 
-    if let Some(constraints) = content.get("technical_constraints").and_then(Value::as_array) {
+    if let Some(constraints) = content
+        .get("technical_constraints")
+        .and_then(Value::as_array)
+    {
         md.push_str("## 技术约束\n\n");
         for c in constraints.iter().filter_map(Value::as_str) {
             md.push_str(&format!("- {}\n", c));
@@ -245,7 +283,10 @@ fn render_prd_markdown(content: &Value) -> String {
         md.push_str("## 验收标准\n\n");
         for ac in criteria {
             let statement = ac.get("statement").and_then(Value::as_str).unwrap_or("-");
-            let crit = ac.get("criticality").and_then(Value::as_str).unwrap_or("must");
+            let crit = ac
+                .get("criticality")
+                .and_then(Value::as_str)
+                .unwrap_or("must");
             md.push_str(&format!("- [{}] {}\n", crit, statement));
         }
         md.push('\n');
@@ -255,7 +296,10 @@ fn render_prd_markdown(content: &Value) -> String {
         md.push_str("## 里程碑\n\n");
         for ms in milestones {
             let title = ms.get("title").and_then(Value::as_str).unwrap_or("-");
-            let desc = ms.get("target_description").and_then(Value::as_str).unwrap_or("");
+            let desc = ms
+                .get("target_description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             md.push_str(&format!("### {}\n\n{}\n\n", title, desc));
         }
     }

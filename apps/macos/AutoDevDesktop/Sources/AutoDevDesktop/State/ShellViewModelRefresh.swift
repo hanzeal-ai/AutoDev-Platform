@@ -102,43 +102,96 @@ extension ShellViewModel {
             do {
                 let shouldStart = state.workflowSnapshots[requestKey.projectID]?.status == .notStarted
                     || state.workflowSnapshots[requestKey.projectID] == nil
-                if shouldStart {
-                    _ = try await daemonClient.startProjectWorkflow(
-                        projectID: requestKey.projectID.uuidString,
-                        feedback: feedback,
-                        action: action
-                    )
-                } else {
-                    _ = try await daemonClient.resumeProjectWorkflow(
-                        projectID: requestKey.projectID.uuidString,
-                        feedback: feedback,
-                        action: action
-                    )
-                }
-                guard state.selectedExecutionDetailKey == requestKey else { return }
+                let stream = daemonClient.runProjectWorkflowStreaming(
+                    projectID: requestKey.projectID.uuidString,
+                    feedback: feedback,
+                    action: action,
+                    mode: shouldStart ? "start" : "resume"
+                )
+                state.workflowRawStreamLines[requestKey.projectID] = []
                 state.statusMessage = "后台 AI 流式生成中..."
-                var pollDelay: UInt64 = 1_000_000_000  // Start at 1 second
-                let maxDelay: UInt64 = 5_000_000_000   // Cap at 5 seconds
-                let maxPolls = 60
-                for _ in 0..<maxPolls {
-                    guard !Task.isCancelled else { return }
-                    await refreshSelectedProjectDetail()
-                    guard state.selectedExecutionDetailKey == requestKey else { return }
-                    if let detail = state.executionDetails[requestKey],
-                       !Self.stageAIGenerationActive(detail)
-                    {
-                        state.statusMessage = "后台 AI 已返回阶段数据"
+                for await event in stream.stream {
+                    guard state.selectedExecutionDetailKey == requestKey else {
+                        stream.cancel()
                         return
                     }
-                    try await Task.sleep(nanoseconds: pollDelay)
-                    pollDelay = min(pollDelay + 500_000_000, maxDelay)
+                    switch event {
+                    case let .raw(rawLine):
+                        appendWorkflowRawStreamLine(projectID: requestKey.projectID, line: rawLine)
+                    case let .update(status, event):
+                        applyWorkflowStreamSnapshot(
+                            projectID: requestKey.projectID,
+                            status: status,
+                            event: event
+                        )
+                    case let .done(status, event):
+                        if let status {
+                            applyWorkflowStreamSnapshot(
+                                projectID: requestKey.projectID,
+                                status: status,
+                                event: event
+                            )
+                        }
+                        await refreshSelectedProjectDetail()
+                        state.statusMessage = "后台 AI 已返回阶段数据"
+                        return
+                    case let .error(message):
+                        throw DaemonClientError.daemonError(code: "workflow_stream_error", detail: message)
+                    }
                 }
-                state.statusMessage = "后台 AI 仍在运行，可稍后刷新查看"
+                await refreshSelectedProjectDetail()
             } catch {
                 guard state.selectedExecutionDetailKey == requestKey else { return }
                 state.apply(operationError: error, context: "触发后台 AI")
             }
         }
+    }
+
+    private func appendWorkflowRawStreamLine(projectID: UUID, line: String) {
+        var lines = state.workflowRawStreamLines[projectID] ?? []
+        lines.append(line)
+        state.workflowRawStreamLines[projectID] = Array(lines.suffix(80))
+    }
+
+    private func applyWorkflowStreamSnapshot(
+        projectID: UUID,
+        status: DaemonProjectWorkflowStatus,
+        event: DaemonWorkflowEvent?
+    ) {
+        let eventPayload = event.map {
+            DaemonProjectWorkflowEvents(
+                workflowId: status.workflowId,
+                threadId: status.threadId,
+                projectId: status.projectId,
+                projectName: status.projectName,
+                currentPhase: status.currentPhase,
+                currentStep: status.currentStep,
+                status: status.status,
+                awaitingUserInput: status.awaitingUserInput,
+                error: status.error,
+                events: [$0]
+            )
+        }
+        var nextSnapshot = DomainMapper.mapWorkflowSnapshot(status: status, events: eventPayload)
+        var previousEvents = state.workflowSnapshots[projectID]?.events ?? []
+        if let event, event.detail.contains("重新执行") {
+            previousEvents.removeAll { $0.stage == event.stage }
+        }
+        nextSnapshot.events = mergeWorkflowEvents(previousEvents + nextSnapshot.events)
+        state.workflowSnapshots[projectID] = nextSnapshot
+    }
+
+    private func mergeWorkflowEvents(_ events: [DeliveryWorkflowEventItem]) -> [DeliveryWorkflowEventItem] {
+        var seen = Set<String>()
+        let merged = events
+            .sorted { $0.sequence < $1.sequence }
+            .filter { event in
+                let key = event.id.isEmpty
+                    ? "\(event.sequence)|\(event.stage)|\(event.detail)"
+                    : event.id
+                return seen.insert(key).inserted
+            }
+        return Array(merged.suffix(80))
     }
 
     func runSelectedWorkflowStep() {

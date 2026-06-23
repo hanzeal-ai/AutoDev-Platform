@@ -22,10 +22,7 @@ pub(crate) fn persist_generic_workflow_artifact(
         .and_then(Value::as_str)
         .filter(|text| !text.trim().is_empty())
         .unwrap_or(label);
-    let input_contexts = json!([
-        format!("产物类型：{}", kind),
-        "来源：统一 workflow graph"
-    ]);
+    let input_contexts = json!([format!("产物类型：{}", kind), "来源：统一 workflow graph"]);
     let step_progress = json!([
         {"title": format!("{} 已生成", label), "status": "completed"}
     ]);
